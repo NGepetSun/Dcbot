@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StreamAlert — YouTube → Discord Notifier</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #18181f;
+    --border: #252530;
+    --accent: #ff3b3b;
+    --accent2: #7c3aed;
+    --discord: #5865F2;
+    --yt: #FF0000;
+    --green: #22c55e;
+    --yellow: #f59e0b;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --mono: 'Space Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: 
+      linear-gradient(rgba(124,58,237,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,58,237,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .glow-orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .orb1 { width: 400px; height: 400px; background: rgba(124,58,237,0.12); top: -100px; right: -100px; }
+  .orb2 { width: 300px; height: 300px; background: rgba(255,59,59,0.08); bottom: 100px; left: -80px; }
+
+  /* Header */
+  header {
+    position: relative;
+    z-index: 10;
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(10px);
+    background: rgba(10,10,15,0.8);
+    position: sticky;
+    top: 0;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  .logo-text {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+
+  .logo-text span { color: var(--accent); }
+
+  .header-badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: rgba(34,197,94,0.1);
+    color: var(--green);
+    border: 1px solid rgba(34,197,94,0.2);
+    padding: 4px 10px;
+    border-radius: 100px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .pulse-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  /* Main layout */
+  main {
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 40px;
+  }
+
+  .page-title {
+    font-size: 13px;
+    font-family: var(--mono);
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .page-heading {
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    margin-bottom: 32px;
+    line-height: 1.1;
+  }
+
+  .page-heading span {
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Stats row */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    transition: border-color 0.2s;
+  }
+
+  .stat-card:hover { border-color: rgba(124,58,237,0.4); }
+
+  .stat-label {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+
+  .stat-value {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -1px;
+  }
+
+  .stat-value.green { color: var(--green); }
+  .stat-value.accent { color: var(--accent); }
+  .stat-value.discord { color: var(--discord); }
+  .stat-value.yellow { color: var(--yellow); }
+
+  /* Two-column layout */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .card-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .card-title {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-body { padding: 24px; }
+
+  /* Form elements */
+  .form-group { margin-bottom: 18px; }
+
+  .form-label {
+    display: block;
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+
+  .form-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .form-input:focus {
+    border-color: var(--accent2);
+    box-shadow: 0 0 0 3px rgba(124,58,237,0.1);
+  }
+
+  .form-input::placeholder { color: var(--muted); }
+
+  select.form-input {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b6b80' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+    letter-spacing: -0.2px;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #c0392b);
+    color: white;
+  }
+
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(255,59,59,0.3); }
+
+  .btn-discord {
+    background: var(--discord);
+    color: white;
+  }
+
+  .btn-discord:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(88,101,242,0.3); }
+
+  .btn-outline {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn-outline:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn-full { width: 100%; }
+
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+
+  /* Channel list */
+  .channel-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .channel-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    transition: border-color 0.2s;
+  }
+
+  .channel-item:hover { border-color: rgba(124,58,237,0.3); }
+
+  .channel-thumb {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--yt), #c0392b);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+    font-weight: 700;
+    color: white;
+  }
+
+  .channel-info { flex: 1; min-width: 0; }
+
+  .channel-name {
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .channel-id {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .channel-status {
+    flex-shrink: 0;
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 100px;
+  }
+
+  .status-live {
+    background: rgba(255,59,59,0.15);
+    color: var(--accent);
+    border: 1px solid rgba(255,59,59,0.3);
+    animation: statusPulse 2s infinite;
+  }
+
+  .status-offline {
+    background: rgba(107,107,128,0.15);
+    color: var(--muted);
+    border: 1px solid rgba(107,107,128,0.2);
+  }
+
+  .status-checking {
+    background: rgba(245,158,11,0.15);
+    color: var(--yellow);
+    border: 1px solid rgba(245,158,11,0.3);
+  }
+
+  @keyframes statusPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,59,59,0.3); }
+    50% { box-shadow: 0 0 0 4px rgba(255,59,59,0); }
+  }
+
+  .channel-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+  .icon-btn {
+    width: 28px; height: 28px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    transition: all 0.15s;
+  }
+
+  .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .icon-btn.del:hover { border-color: var(--accent); background: rgba(255,59,59,0.1); }
+
+  /* Log feed */
+  .log-feed {
+    height: 240px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 4px;
+  }
+
+  .log-feed::-webkit-scrollbar { width: 4px; }
+  .log-feed::-webkit-scrollbar-track { background: transparent; }
+  .log-feed::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .log-entry {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 10px;
+    background: var(--surface2);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .log-time { color: var(--muted); flex-shrink: 0; }
+
+  .log-type {
+    flex-shrink: 0;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .log-type.info { background: rgba(88,101,242,0.2); color: var(--discord); }
+  .log-type.live { background: rgba(255,59,59,0.2); color: var(--accent); }
+  .log-type.sent { background: rgba(34,197,94,0.2); color: var(--green); }
+  .log-type.warn { background: rgba(245,158,11,0.2); color: var(--yellow); }
+  .log-type.err { background: rgba(255,59,59,0.15); color: #ff6b6b; }
+
+  .log-msg { color: var(--text); line-height: 1.4; }
+
+  /* Notification preview */
+  .discord-preview {
+    background: #36393f;
+    border-radius: 10px;
+    padding: 16px;
+    border-left: 4px solid var(--yt);
+  }
+
+  .discord-bot-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 2px;
+  }
+
+  .discord-bot-tag {
+    font-size: 10px;
+    background: var(--discord);
+    color: #fff;
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-left: 6px;
+    font-weight: 700;
+  }
+
+  .discord-embed {
+    margin-top: 8px;
+    background: #2f3136;
+    border-radius: 6px;
+    padding: 12px;
+  }
+
+  .discord-embed-title {
+    font-size: 14px;
+    color: #00b0f4;
+    font-weight: 700;
+    margin-bottom: 6px;
+    cursor: pointer;
+  }
+
+  .discord-embed-title:hover { text-decoration: underline; }
+
+  .discord-embed-desc {
+    font-size: 12px;
+    color: #dcddde;
+    margin-bottom: 10px;
+    line-height: 1.5;
+  }
+
+  .discord-embed-thumb {
+    width: 80px; height: 45px;
+    background: linear-gradient(135deg, #111, #333);
+    border-radius: 4px;
+    float: right;
+    margin-left: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+  }
+
+  .discord-embed-footer {
+    font-size: 11px;
+    color: #72767d;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    clear: both;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .discord-embed-footer img {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+  }
+
+  /* Webhook config */
+  .webhook-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+  }
+
+  .webhook-icon {
+    width: 32px; height: 32px;
+    background: var(--discord);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .webhook-info { flex: 1; min-width: 0; }
+  .webhook-name { font-size: 12px; font-weight: 700; }
+  .webhook-url { font-family: var(--mono); font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(124,58,237,0.15);
+    color: #a78bfa;
+    border: 1px solid rgba(124,58,237,0.2);
+  }
+
+  /* Check interval badge */
+  .interval-badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  /* Toast notifications */
+  #toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+  }
+
+  .toast {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: toastIn 0.3s ease;
+    pointer-events: all;
+    max-width: 320px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+
+  .toast.success { border-color: rgba(34,197,94,0.4); }
+  .toast.error { border-color: rgba(255,59,59,0.4); }
+  .toast.info { border-color: rgba(88,101,242,0.4); }
+
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+  }
+
+  .empty-state .icon { font-size: 32px; margin-bottom: 10px; }
+  .empty-state .msg { font-size: 13px; }
+
+  /* Divider */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 16px 0;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    max-width: 480px;
+    width: 90%;
+    animation: modalIn 0.25s ease;
+  }
+
+  @keyframes modalIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .modal-title {
+    font-size: 18px;
+    font-weight: 800;
+    margin-bottom: 6px;
+    letter-spacing: -0.5px;
+  }
+
+  .modal-subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    justify-content: flex-end;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    main { padding: 24px 20px; }
+    header { padding: 16px 20px; }
+    .stats-row { grid-template-columns: 1fr 1fr; }
+    .grid-2 { grid-template-columns: 1fr; }
+    .form-row { grid-template-columns: 1fr; }
+    .page-heading { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="glow-orb orb1"></div>
+<div class="glow-orb orb2"></div>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🔔</div>
+    <div class="logo-text">Stream<span>Alert</span></div>
+  </div>
+  <div style="display:flex; align-items:center; gap:12px;">
+    <div class="interval-badge" id="interval-badge">Cek tiap 5 menit</div>
+    <div class="header-badge">
+      <div class="pulse-dot" id="status-dot"></div>
+      <span id="status-text">Menunggu...</span>
+    </div>
+  </div>
+</header>
+
+<!-- Main -->
+<main>
+  <p class="page-title">Dashboard</p>
+  <h1 class="page-heading">YouTube → <span>Discord</span> Notifier</h1>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Channel Dipantau</div>
+      <div class="stat-value accent" id="stat-channels">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Sedang Live</div>
+      <div class="stat-value green" id="stat-live">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Webhook Aktif</div>
+      <div class="stat-value discord" id="stat-webhooks">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Notif Terkirim</div>
+      <div class="stat-value yellow" id="stat-sent">0</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- Add Channel Card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <span style="color:var(--yt)">▶</span> Tambah Channel YouTube
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">Channel ID atau Username</label>
+          <input class="form-input" id="yt-channel-input" placeholder="@NamaChannel atau UCxxxx..." />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nama Tampilan</label>
+          <input class="form-input" id="yt-name-input" placeholder="Nama channel..." />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Webhook Discord</label>
+            <select class="form-input" id="yt-webhook-select">
+              <option value="">— Pilih Webhook —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cek Interval</label>
+            <select class="form-input" id="yt-interval-select">
+              <option value="1">1 menit</option>
+              <option value="5" selected>5 menit</option>
+              <option value="10">10 menit</option>
+              <option value="30">30 menit</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="addChannel()">
+          ＋ Tambah Channel
+        </button>
+      </div>
+    </div>
+
+    <!-- Webhook Config Card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <span style="color:var(--discord)">🔗</span> Konfigurasi Webhook Discord
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="webhook-list"></div>
+        <div class="divider"></div>
+        <div class="form-group">
+          <label class="form-label">Nama Webhook</label>
+          <input class="form-input" id="wh-name" placeholder="Server Gaming, dll..." />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Webhook URL</label>
+          <input class="form-input" id="wh-url" placeholder="https://discord.com/api/webhooks/..." />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Pesan Custom (opsional)</label>
+          <input class="form-input" id="wh-message" placeholder="@everyone {channel} sedang LIVE! 🔴" />
+        </div>
+        <button class="btn btn-discord btn-full" onclick="addWebhook()">
+          🔗 Simpan Webhook
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- Channel Monitor -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          📺 Channel Dipantau
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-outline btn-sm" onclick="checkAllNow()">🔄 Cek Sekarang</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding-top:16px;">
+        <div class="channel-list" id="channel-list">
+          <div class="empty-state">
+            <div class="icon">📭</div>
+            <div class="msg">Belum ada channel. Tambahkan di atas!</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          📋 Activity Log
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="clearLog()">🗑️ Clear</button>
+      </div>
+      <div class="card-body" style="padding-top:16px;">
+        <div class="log-feed" id="log-feed">
+          <div class="empty-state" style="padding:20px;">
+            <div class="msg">Log aktivitas akan muncul di sini...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Discord Preview -->
+  <div class="card" style="margin-top:0;">
+    <div class="card-header">
+      <div class="card-title">
+        💬 Preview Notifikasi Discord
+      </div>
+      <div class="tag">Contoh Tampilan</div>
+    </div>
+    <div class="card-body">
+      <div class="discord-preview" id="discord-preview">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+          <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#ff3b3b,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:14px;">🔔</div>
+          <div>
+            <div class="discord-bot-name">StreamAlert <span class="discord-bot-tag">BOT</span></div>
+            <div style="font-size:10px;color:#72767d;">Hari ini pukul <span id="preview-time">21:30</span></div>
+          </div>
+        </div>
+        <div style="font-size:13px;color:#dcddde;margin-bottom:8px;" id="preview-mention">@everyone 🔴 <strong id="preview-channel-name">NamaChannel</strong> baru saja mulai LIVE!</div>
+        <div class="discord-embed">
+          <div class="discord-embed-thumb">▶️</div>
+          <div class="discord-embed-title" id="preview-title">🔴 [LIVE] Judul Stream Sekarang!</div>
+          <div class="discord-embed-desc" id="preview-desc">NamaChannel sedang live sekarang! Jangan sampai ketinggalan~<br>
+          📺 Kategori: Gaming<br>👀 Sedang ditonton banyak orang</div>
+          <div class="discord-embed-footer">
+            <div style="width:14px;height:14px;border-radius:50%;background:#ff0000;display:inline-block;"></div>
+            YouTube Live • Baru saja mulai
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
+        <div class="form-group" style="flex:1;min-width:200px;margin:0;">
+          <label class="form-label">Nama Channel untuk Preview</label>
+          <input class="form-input" id="preview-channel-input" placeholder="MitojiOfficial" oninput="updatePreview()" />
+        </div>
+        <div class="form-group" style="flex:1;min-width:200px;margin:0;">
+          <label class="form-label">Judul Stream untuk Preview</label>
+          <input class="form-input" id="preview-title-input" placeholder="Gaming bareng teman!" oninput="updatePreview()" />
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<!-- Modal: Confirm Delete -->
+<div class="modal-overlay" id="delete-modal">
+  <div class="modal">
+    <div class="modal-title">Hapus Channel?</div>
+    <div class="modal-subtitle" id="delete-modal-subtitle">Yakin ingin menghapus channel ini dari pemantauan?</div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeDeleteModal()">Batal</button>
+      <button class="btn btn-primary" onclick="confirmDelete()">Hapus</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// State
+let channels = JSON.parse(localStorage.getItem('sa_channels') || '[]');
+let webhooks = JSON.parse(localStorage.getItem('sa_webhooks') || '[]');
+let notifsSent = parseInt(localStorage.getItem('sa_sent') || '0');
+let deleteTargetId = null;
+let checkIntervals = {};
+let isRunning = false;
+
+// Init
+function init() {
+  renderChannels();
+  renderWebhooks();
+  updateStats();
+  updatePreviewTime();
+  if (channels.length > 0) startMonitoring();
+}
+
+// --- Stats ---
+function updateStats() {
+  document.getElementById('stat-channels').textContent = channels.length;
+  document.getElementById('stat-live').textContent = channels.filter(c => c.status === 'live').length;
+  document.getElementById('stat-webhooks').textContent = webhooks.length;
+  document.getElementById('stat-sent').textContent = notifsSent;
+}
+
+// --- Webhook ---
+function addWebhook() {
+  const name = document.getElementById('wh-name').value.trim();
+  const url = document.getElementById('wh-url').value.trim();
+  const msg = document.getElementById('wh-message').value.trim();
+
+  if (!name) return showToast('Masukkan nama webhook!', 'error');
+  if (!url || !url.startsWith('https://discord.com/api/webhooks/')) 
+    return showToast('URL webhook Discord tidak valid!', 'error');
+
+  const wh = { id: Date.now().toString(), name, url, message: msg || '@everyone 🔴 {channel} sedang LIVE di YouTube!' };
+  webhooks.push(wh);
+  saveWebhooks();
+  renderWebhooks();
+  updateWebhookSelect();
+  document.getElementById('wh-name').value = '';
+  document.getElementById('wh-url').value = '';
+  document.getElementById('wh-message').value = '';
+  showToast(`Webhook "${name}" berhasil ditambahkan!`, 'success');
+  addLog('info', `Webhook Discord "${name}" dikonfigurasi`);
+}
+
+function deleteWebhook(id) {
+  webhooks = webhooks.filter(w => w.id !== id);
+  saveWebhooks();
+  renderWebhooks();
+  updateWebhookSelect();
+  showToast('Webhook dihapus', 'info');
+}
+
+function renderWebhooks() {
+  const container = document.getElementById('webhook-list');
+  updateStats();
+  if (webhooks.length === 0) {
+    container.innerHTML = '<div class="empty-state" style="padding:16px 0;"><div class="msg">Belum ada webhook. Tambahkan di bawah!</div></div>';
+    return;
+  }
+  container.innerHTML = webhooks.map(wh => `
+    <div class="webhook-item">
+      <div class="webhook-icon">🔗</div>
+      <div class="webhook-info">
+        <div class="webhook-name">${escHtml(wh.name)}</div>
+        <div class="webhook-url">${escHtml(wh.url.substring(0,60))}...</div>
+      </div>
+      <button class="icon-btn del" onclick="deleteWebhook('${wh.id}')" title="Hapus">🗑</button>
+    </div>
+  `).join('');
+  updateWebhookSelect();
+}
+
+function updateWebhookSelect() {
+  const sel = document.getElementById('yt-webhook-select');
+  sel.innerHTML = '<option value="">— Pilih Webhook —</option>' + 
+    webhooks.map(w => `<option value="${w.id}">${escHtml(w.name)}</option>`).join('');
+}
+
+// --- Channels ---
+function addChannel() {
+  const id = document.getElementById('yt-channel-input').value.trim();
+  const name = document.getElementById('yt-name-input').value.trim();
+  const webhookId = document.getElementById('yt-webhook-select').value;
+  const interval = parseInt(document.getElementById('yt-interval-select').value);
+
+  if (!id) return showToast('Masukkan Channel ID atau username!', 'error');
+  if (!name) return showToast('Masukkan nama channel!', 'error');
+  if (!webhookId) return showToast('Pilih webhook Discord terlebih dahulu!', 'error');
+  if (channels.find(c => c.ytId === id)) return showToast('Channel sudah ada!', 'error');
+
+  const ch = {
+    id: Date.now().toString(),
+    ytId: id,
+    name,
+    webhookId,
+    interval,
+    status: 'offline',
+    lastCheck: null,
+    avatar: name.charAt(0).toUpperCase()
+  };
+
+  channels.push(ch);
+  saveChannels();
+  renderChannels();
+  updateStats();
+  document.getElementById('yt-channel-input').value = '';
+  document.getElementById('yt-name-input').value = '';
+  showToast(`Channel "${name}" berhasil ditambahkan!`, 'success');
+  addLog('info', `Mulai memantau channel: ${name} (${id})`);
+
+  scheduleCheck(ch);
+  updateHeaderStatus();
+}
+
+function renderChannels() {
+  const list = document.getElementById('channel-list');
+  if (channels.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="icon">📭</div><div class="msg">Belum ada channel. Tambahkan di atas!</div></div>';
+    return;
+  }
+  list.innerHTML = channels.map(ch => {
+    const wh = webhooks.find(w => w.id === ch.webhookId);
+    const statusClass = ch.status === 'live' ? 'status-live' : ch.status === 'checking' ? 'status-checking' : 'status-offline';
+    const statusText = ch.status === 'live' ? '🔴 LIVE' : ch.status === 'checking' ? '⏳ Cek...' : '⚫ Offline';
+    return `
+      <div class="channel-item" id="ch-${ch.id}">
+        <div class="channel-thumb">${ch.avatar}</div>
+        <div class="channel-info">
+          <div class="channel-name">${escHtml(ch.name)}</div>
+          <div class="channel-id">${escHtml(ch.ytId)} • ${wh ? escHtml(wh.name) : 'No webhook'} • Cek tiap ${ch.interval}m</div>
+        </div>
+        <div class="channel-status ${statusClass}">${statusText}</div>
+        <div class="channel-actions">
+          <button class="icon-btn" onclick="manualCheck('${ch.id}')" title="Cek sekarang">🔄</button>
+          <button class="icon-btn del" onclick="openDeleteModal('${ch.id}')" title="Hapus">🗑</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function updateChannelStatus(id, status) {
+  const ch = channels.find(c => c.id === id);
+  if (!ch) return;
+  ch.status = status;
+  ch.lastCheck = new Date().toISOString();
+  saveChannels();
+  
+  const el = document.getElementById(`ch-${id}`);
+  if (!el) return;
+  
+  const statusEl = el.querySelector('.channel-status');
+  statusEl.className = 'channel-status ' + (status === 'live' ? 'status-live' : status === 'checking' ? 'status-checking' : 'status-offline');
+  statusEl.textContent = status === 'live' ? '🔴 LIVE' : status === 'checking' ? '⏳ Cek...' : '⚫ Offline';
+  updateStats();
+}
+
+// --- Check Logic ---
+function scheduleCheck(ch) {
+  if (checkIntervals[ch.id]) clearInterval(checkIntervals[ch.id]);
+  
+  simulateCheck(ch); // immediate first check
+  checkIntervals[ch.id] = setInterval(() => simulateCheck(ch), ch.interval * 60 * 1000);
+}
+
+function simulateCheck(ch) {
+  updateChannelStatus(ch.id, 'checking');
+  addLog('info', `Memeriksa status ${ch.name}...`);
+
+  // Simulate API delay
+  setTimeout(() => {
+    // Simulate random live status (in real app, use YouTube Data API v3)
+    const isLive = Math.random() < 0.15; // 15% chance live for demo
+    const wasLive = ch.status === 'live';
+    const newStatus = isLive ? 'live' : 'offline';
+
+    updateChannelStatus(ch.id, newStatus);
+
+    if (isLive && !wasLive) {
+      addLog('live', `🔴 ${ch.name} mulai LIVE!`);
+      sendDiscordNotification(ch);
+    } else if (!isLive && wasLive) {
+      addLog('info', `${ch.name} sudah selesai live`);
+    } else {
+      addLog('info', `${ch.name}: ${isLive ? 'Masih LIVE' : 'Offline'}`);
+    }
+  }, 1200 + Math.random() * 800);
+}
+
+function manualCheck(id) {
+  const ch = channels.find(c => c.id === id);
+  if (!ch) return;
+  simulateCheck(ch);
+  showToast(`Memeriksa ${ch.name}...`, 'info');
+}
+
+function checkAllNow() {
+  if (channels.length === 0) return showToast('Belum ada channel untuk diperiksa!', 'error');
+  channels.forEach(ch => simulateCheck(ch));
+  showToast(`Memeriksa ${channels.length} channel...`, 'info');
+}
+
+// --- Discord Notification ---
+function sendDiscordNotification(ch) {
+  const wh = webhooks.find(w => w.id === ch.webhookId);
+  if (!wh) return addLog('err', `Webhook tidak ditemukan untuk ${ch.name}`);
+
+  const streamTitle = `[LIVE] ${ch.name} sedang streaming sekarang!`;
+  const mention = wh.message.replace('{channel}', ch.name);
+
+  // Simulate sending webhook
+  addLog('sent', `Notifikasi dikirim ke Discord untuk ${ch.name}`);
+
+  // In real app, uncomment this:
+  /*
+  const payload = {
+    content: mention,
+    embeds: [{
+      title: streamTitle,
+      url: `https://youtube.com/${ch.ytId}/live`,
+      description: `${ch.name} sedang live sekarang! Jangan sampai ketinggalan~`,
+      color: 0xFF0000,
+      thumbnail: { url: "https://yt-thumbnail-url.jpg" },
+      footer: { text: "YouTube Live", icon_url: "https://youtube.com/favicon.ico" },
+      timestamp: new Date().toISOString()
+    }]
+  };
+
+  fetch(wh.url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(r => {
+    if (r.ok) addLog('sent', `✅ Notif terkirim ke ${wh.name}`);
+    else addLog('err', `Gagal kirim ke ${wh.name}: ${r.status}`);
+  }).catch(e => addLog('err', `Error: ${e.message}`));
+  */
+
+  notifsSent++;
+  localStorage.setItem('sa_sent', notifsSent.toString());
+  updateStats();
+  showToast(`🔴 Notif LIVE ${ch.name} dikirim ke Discord!`, 'success');
+}
+
+// --- Log ---
+function addLog(type, msg) {
+  const feed = document.getElementById('log-feed');
+  const emptyState = feed.querySelector('.empty-state');
+  if (emptyState) emptyState.remove();
+
+  const now = new Date();
+  const time = now.toTimeString().slice(0,8);
+
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `
+    <span class="log-time">${time}</span>
+    <span class="log-type ${type}">${type.toUpperCase()}</span>
+    <span class="log-msg">${escHtml(msg)}</span>
+  `;
+
+  feed.insertBefore(entry, feed.firstChild);
+
+  // Keep max 50 logs
+  while (feed.children.length > 50) feed.removeChild(feed.lastChild);
+}
+
+function clearLog() {
+  const feed = document.getElementById('log-feed');
+  feed.innerHTML = '<div class="empty-state" style="padding:20px;"><div class="msg">Log dibersihkan.</div></div>';
+}
+
+// --- Preview ---
+function updatePreview() {
+  const name = document.getElementById('preview-channel-input').value || 'NamaChannel';
+  const title = document.getElementById('preview-title-input').value || 'Judul Stream Sekarang!';
+  document.getElementById('preview-channel-name').textContent = name;
+  document.getElementById('preview-title').textContent = `🔴 [LIVE] ${title}`;
+  document.getElementById('preview-desc').innerHTML = `${escHtml(name)} sedang live sekarang! Jangan sampai ketinggalan~<br>📺 Kategori: Gaming<br>👀 Sedang ditonton banyak orang`;
+  document.getElementById('preview-mention').innerHTML = `@everyone 🔴 <strong>${escHtml(name)}</strong> baru saja mulai LIVE!`;
+}
+
+function updatePreviewTime() {
+  const now = new Date();
+  document.getElementById('preview-time').textContent = 
+    now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+}
+
+// --- Delete Modal ---
+function openDeleteModal(id) {
+  const ch = channels.find(c => c.id === id);
+  if (!ch) return;
+  deleteTargetId = id;
+  document.getElementById('delete-modal-subtitle').textContent = `Yakin ingin menghapus "${ch.name}" dari pemantauan?`;
+  document.getElementById('delete-modal').classList.add('open');
+}
+
+function closeDeleteModal() {
+  deleteTargetId = null;
+  document.getElementById('delete-modal').classList.remove('open');
+}
+
+function confirmDelete() {
+  if (!deleteTargetId) return;
+  const ch = channels.find(c => c.id === deleteTargetId);
+  if (checkIntervals[deleteTargetId]) {
+    clearInterval(checkIntervals[deleteTargetId]);
+    delete checkIntervals[deleteTargetId];
+  }
+  channels = channels.filter(c => c.id !== deleteTargetId);
+  saveChannels();
+  renderChannels();
+  updateStats();
+  addLog('warn', `Channel "${ch?.name}" dihapus dari pemantauan`);
+  showToast(`Channel "${ch?.name}" dihapus`, 'info');
+  closeDeleteModal();
+}
+
+// --- Status header ---
+function updateHeaderStatus() {
+  const running = channels.length > 0;
+  const dot = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+  dot.style.background = running ? 'var(--green)' : 'var(--muted)';
+  text.textContent = running ? `Memantau ${channels.length} channel` : 'Menunggu...';
+
+  const interval = channels.length > 0 ? Math.min(...channels.map(c => c.interval)) : 5;
+  document.getElementById('interval-badge').textContent = `Cek tiap ${interval} menit`;
+}
+
+function startMonitoring() {
+  channels.forEach(ch => scheduleCheck(ch));
+  updateHeaderStatus();
+}
+
+// --- Toast ---
+function showToast(msg, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `<span>${icons[type]}</span><span>${escHtml(msg)}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(20px)';
+    toast.style.transition = 'all 0.3s ease';
+    setTimeout(() => toast.remove(), 300);
+  }, 3500);
+}
+
+// --- Helpers ---
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function saveChannels() { localStorage.setItem('sa_channels', JSON.stringify(channels)); updateHeaderStatus(); }
+function saveWebhooks() { localStorage.setItem('sa_webhooks', JSON.stringify(webhooks)); }
+
+// Close modal on overlay click
+document.getElementById('delete-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeDeleteModal();
+});
+
+// Init
+init();
+</script>
+</body>
+</html>
