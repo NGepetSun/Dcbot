@@ -1,1492 +1,764 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>StreamPulse — Discord Live Notifier</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #0a0a0f;
-    --surface: #12121a;
-    --surface2: #1a1a26;
-    --border: #2a2a3d;
-    --accent: #7c3aed;
-    --accent2: #06b6d4;
-    --live: #ef4444;
-    --success: #10b981;
-    --warn: #f59e0b;
-    --text: #e8e8f0;
-    --muted: #6b6b8a;
-    --glow: rgba(124,58,237,0.3);
-  }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Syne', sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  /* Background grid */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(124,58,237,0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(124,58,237,0.04) 1px, transparent 1px);
-    background-size: 48px 48px;
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  /* Glow orbs */
-  .orb1 {
-    position: fixed; top: -200px; right: -100px;
-    width: 500px; height: 500px;
-    background: radial-gradient(circle, rgba(124,58,237,0.18) 0%, transparent 70%);
-    pointer-events: none; z-index: 0;
-  }
-  .orb2 {
-    position: fixed; bottom: -150px; left: -100px;
-    width: 400px; height: 400px;
-    background: radial-gradient(circle, rgba(6,182,212,0.12) 0%, transparent 70%);
-    pointer-events: none; z-index: 0;
-  }
-
-  .container {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 0 24px;
-    position: relative;
-    z-index: 1;
-  }
-
-  /* HEADER */
-  header {
-    padding: 40px 0 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .logo {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .logo-icon {
-    width: 44px; height: 44px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    border-radius: 12px;
-    display: grid;
-    place-items: center;
-    font-size: 22px;
-    box-shadow: 0 0 24px var(--glow);
-  }
-
-  .logo-text {
-    font-size: 22px;
-    font-weight: 800;
-    letter-spacing: -0.5px;
-  }
-
-  .logo-text span { color: var(--accent); }
-
-  .badge-live {
-    background: var(--live);
-    color: white;
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-    font-weight: 700;
-    padding: 4px 10px;
-    border-radius: 20px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    animation: pulse-badge 2s infinite;
-  }
-
-  .badge-live::before {
-    content: '';
-    width: 6px; height: 6px;
-    background: white;
-    border-radius: 50%;
-    animation: blink 1s infinite;
-  }
-
-  @keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0; }
-  }
-
-  @keyframes pulse-badge {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
-    50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
-  }
-
-  /* HERO */
-  .hero {
-    padding: 48px 0 40px;
-    text-align: center;
-  }
-
-  .hero h1 {
-    font-size: clamp(36px, 6vw, 64px);
-    font-weight: 800;
-    line-height: 1.08;
-    letter-spacing: -2px;
-    margin-bottom: 16px;
-  }
-
-  .hero h1 .gradient {
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-
-  .hero p {
-    color: var(--muted);
-    font-size: 17px;
-    font-weight: 400;
-    max-width: 520px;
-    margin: 0 auto;
-    line-height: 1.6;
-  }
-
-  /* STEPPER */
-  .stepper {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0;
-    margin: 40px 0;
-  }
-
-  .step-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-  }
-
-  .step-num {
-    width: 32px; height: 32px;
-    border-radius: 50%;
-    background: var(--surface2);
-    border: 2px solid var(--border);
-    display: grid;
-    place-items: center;
-    font-family: 'Space Mono', monospace;
-    font-size: 12px;
-    font-weight: 700;
-    transition: all 0.3s;
-  }
-
-  .step-item.active .step-num {
-    background: var(--accent);
-    border-color: var(--accent);
-    box-shadow: 0 0 16px var(--glow);
-  }
-
-  .step-item.done .step-num {
-    background: var(--success);
-    border-color: var(--success);
-  }
-
-  .step-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--muted);
-    transition: color 0.3s;
-  }
-
-  .step-item.active .step-label { color: var(--text); }
-  .step-item.done .step-label { color: var(--success); }
-
-  .step-line {
-    width: 48px; height: 2px;
-    background: var(--border);
-    transition: background 0.3s;
-    margin: 0 4px;
-  }
-
-  .step-line.done { background: var(--success); }
-
-  /* PANEL */
-  .panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 32px;
-    margin-bottom: 24px;
-    position: relative;
-    overflow: hidden;
-    animation: fadeIn 0.4s ease;
-  }
-
-  .panel::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .panel-header {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    margin-bottom: 28px;
-  }
-
-  .panel-icon {
-    width: 48px; height: 48px;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    display: grid;
-    place-items: center;
-    font-size: 22px;
-    flex-shrink: 0;
-  }
-
-  .panel-title {
-    font-size: 20px;
-    font-weight: 800;
-    letter-spacing: -0.5px;
-  }
-
-  .panel-sub {
-    font-size: 13px;
-    color: var(--muted);
-    margin-top: 2px;
-  }
-
-  /* FORM */
-  .form-group {
-    margin-bottom: 20px;
-  }
-
-  label {
-    display: block;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 8px;
-  }
-
-  input, textarea, select {
-    width: 100%;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 16px;
-    font-family: 'Space Mono', monospace;
-    font-size: 13px;
-    color: var(--text);
-    outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
-  }
-
-  input:focus, textarea:focus, select:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--glow);
-  }
-
-  input::placeholder, textarea::placeholder {
-    color: var(--muted);
-    opacity: 0.6;
-  }
-
-  textarea { resize: vertical; min-height: 100px; }
-
-  select option { background: var(--surface2); }
-
-  /* INPUT ROW */
-  .input-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-  }
-
-  @media (max-width: 600px) {
-    .input-row { grid-template-columns: 1fr; }
-  }
-
-  /* WEBHOOK HELPER */
-  .info-box {
-    background: rgba(124,58,237,0.08);
-    border: 1px solid rgba(124,58,237,0.25);
-    border-radius: 10px;
-    padding: 14px 16px;
-    font-size: 13px;
-    color: #a78bfa;
-    display: flex;
-    gap: 10px;
-    align-items: flex-start;
-    margin-bottom: 20px;
-  }
-
-  .info-box .icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
-
-  /* PLATFORM GRID */
-  .platform-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    margin-bottom: 8px;
-  }
-
-  @media (max-width: 500px) {
-    .platform-grid { grid-template-columns: 1fr 1fr; }
-  }
-
-  .platform-card {
-    background: var(--surface2);
-    border: 2px solid var(--border);
-    border-radius: 12px;
-    padding: 16px 12px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .platform-card:hover {
-    border-color: var(--accent);
-    transform: translateY(-2px);
-  }
-
-  .platform-card.selected {
-    border-color: var(--accent);
-    background: rgba(124,58,237,0.1);
-    box-shadow: 0 0 16px var(--glow);
-  }
-
-  .platform-card .emoji { font-size: 28px; margin-bottom: 6px; }
-  .platform-card .name { font-size: 12px; font-weight: 700; color: var(--muted); }
-  .platform-card.selected .name { color: var(--text); }
-
-  /* TOGGLE SWITCH */
-  .toggle-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 0;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .toggle-row:last-child { border-bottom: none; }
-
-  .toggle-info h4 { font-size: 14px; font-weight: 700; }
-  .toggle-info p { font-size: 12px; color: var(--muted); margin-top: 2px; }
-
-  .toggle {
-    width: 48px; height: 26px;
-    background: var(--border);
-    border-radius: 20px;
-    position: relative;
-    cursor: pointer;
-    transition: background 0.3s;
-    flex-shrink: 0;
-  }
-
-  .toggle.on { background: var(--accent); }
-
-  .toggle::after {
-    content: '';
-    position: absolute;
-    top: 3px; left: 3px;
-    width: 20px; height: 20px;
-    background: white;
-    border-radius: 50%;
-    transition: transform 0.3s;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-  }
-
-  .toggle.on::after { transform: translateX(22px); }
-
-  /* BTN */
-  .btn {
-    padding: 14px 28px;
-    border-radius: 10px;
-    font-family: 'Syne', sans-serif;
-    font-size: 15px;
-    font-weight: 700;
-    cursor: pointer;
-    border: none;
-    transition: all 0.2s;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .btn-primary {
-    background: linear-gradient(135deg, var(--accent), #9333ea);
-    color: white;
-    box-shadow: 0 4px 20px var(--glow);
-    width: 100%;
-    justify-content: center;
-    font-size: 16px;
-    padding: 16px;
-  }
-
-  .btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 28px var(--glow);
-  }
-
-  .btn-primary:active { transform: translateY(0); }
-
-  .btn-secondary {
-    background: var(--surface2);
-    color: var(--text);
-    border: 1px solid var(--border);
-  }
-
-  .btn-secondary:hover { border-color: var(--accent); }
-
-  .btn-outline {
-    background: transparent;
-    color: var(--accent);
-    border: 1px solid var(--accent);
-  }
-
-  .btn-outline:hover { background: rgba(124,58,237,0.1); }
-
-  .btn-danger {
-    background: rgba(239,68,68,0.1);
-    color: var(--live);
-    border: 1px solid rgba(239,68,68,0.3);
-  }
-
-  .btn-danger:hover { background: rgba(239,68,68,0.2); }
-
-  /* NAV BTNS */
-  .nav-btns {
-    display: flex;
-    gap: 12px;
-    margin-top: 24px;
-  }
-
-  /* STATUS PANEL */
-  .status-panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    overflow: hidden;
-    margin-bottom: 24px;
-  }
-
-  .status-header {
-    padding: 18px 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface2);
-  }
-
-  .status-dot {
-    width: 10px; height: 10px;
-    border-radius: 50%;
-    background: var(--muted);
-    margin-right: 8px;
-    display: inline-block;
-  }
-
-  .status-dot.active {
-    background: var(--success);
-    box-shadow: 0 0 8px var(--success);
-    animation: blink 1.5s infinite;
-  }
-
-  .status-dot.error { background: var(--live); }
-
-  .status-title {
-    font-size: 14px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  /* LOG */
-  .log-area {
-    font-family: 'Space Mono', monospace;
-    font-size: 12px;
-    padding: 16px 24px;
-    max-height: 220px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .log-area::-webkit-scrollbar { width: 4px; }
-  .log-area::-webkit-scrollbar-track { background: transparent; }
-  .log-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-
-  .log-line {
-    display: flex;
-    gap: 12px;
-    animation: slideIn 0.2s ease;
-  }
-
-  @keyframes slideIn {
-    from { opacity: 0; transform: translateX(-8px); }
-    to { opacity: 1; transform: translateX(0); }
-  }
-
-  .log-time { color: var(--muted); flex-shrink: 0; }
-  .log-msg { color: var(--text); }
-  .log-line.success .log-msg { color: var(--success); }
-  .log-line.error .log-msg { color: var(--live); }
-  .log-line.warn .log-msg { color: var(--warn); }
-
-  /* PREVIEW */
-  .discord-preview {
-    background: #36393f;
-    border-radius: 12px;
-    padding: 16px 20px;
-    font-family: 'Space Mono', monospace;
-    font-size: 13px;
-  }
-
-  .discord-webhook-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 12px;
-  }
-
-  .bot-avatar {
-    width: 36px; height: 36px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    border-radius: 50%;
-    display: grid;
-    place-items: center;
-    font-size: 16px;
-    flex-shrink: 0;
-  }
-
-  .bot-name { font-weight: 700; font-size: 14px; color: #fff; }
-  .bot-tag { font-size: 10px; color: #5865F2; background: rgba(88,101,242,0.2); padding: 2px 6px; border-radius: 4px; font-weight: 600; }
-
-  .embed {
-    border-left: 4px solid var(--live);
-    background: #2f3136;
-    border-radius: 4px;
-    padding: 12px 16px;
-  }
-
-  .embed-title { color: #fff; font-weight: 700; font-size: 14px; margin-bottom: 4px; }
-  .embed-desc { color: #dcddde; font-size: 12px; margin-bottom: 10px; line-height: 1.6; }
-  .embed-field { margin-bottom: 6px; }
-  .embed-field-name { color: #b9bbbe; font-size: 11px; font-weight: 700; text-transform: uppercase; }
-  .embed-field-value { color: #dcddde; font-size: 12px; }
-
-  /* STATS ROW */
-  .stats-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    margin-bottom: 24px;
-  }
-
-  @media (max-width: 500px) {
-    .stats-row { grid-template-columns: 1fr; }
-  }
-
-  .stat-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 18px 20px;
-    text-align: center;
-  }
-
-  .stat-val {
-    font-family: 'Space Mono', monospace;
-    font-size: 28px;
-    font-weight: 700;
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-
-  .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
-
-  /* FOOTER */
-  footer {
-    text-align: center;
-    padding: 40px 0;
-    color: var(--muted);
-    font-size: 12px;
-    font-family: 'Space Mono', monospace;
-  }
-
-  footer a { color: var(--accent); text-decoration: none; }
-
-  /* HIDDEN */
-  .hidden { display: none !important; }
-
-  /* TAG COLORS */
-  .tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 700;
-  }
-
-  .tag-purple { background: rgba(124,58,237,0.15); color: #a78bfa; }
-  .tag-cyan { background: rgba(6,182,212,0.15); color: #67e8f9; }
-  .tag-red { background: rgba(239,68,68,0.15); color: #fca5a5; }
-  .tag-green { background: rgba(16,185,129,0.15); color: #6ee7b7; }
-
-  /* INTERVAL SELECTOR */
-  .interval-pills {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  .pill {
-    padding: 8px 16px;
-    border-radius: 20px;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-family: 'Space Mono', monospace;
-  }
-
-  .pill:hover { border-color: var(--accent); }
-  .pill.selected {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: white;
-    box-shadow: 0 0 12px var(--glow);
-  }
+:root {
+  --bg:#0a0a0f; --surface:#12121a; --surface2:#1a1a26; --border:#2a2a3d;
+  --accent:#7c3aed; --accent2:#06b6d4; --live:#ef4444;
+  --success:#10b981; --warn:#f59e0b; --text:#e8e8f0; --muted:#6b6b8a;
+  --glow:rgba(124,58,237,0.3);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(124,58,237,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(124,58,237,0.04) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0;}
+.orb1{position:fixed;top:-200px;right:-100px;width:500px;height:500px;background:radial-gradient(circle,rgba(124,58,237,0.18) 0%,transparent 70%);pointer-events:none;z-index:0;}
+.orb2{position:fixed;bottom:-150px;left:-100px;width:400px;height:400px;background:radial-gradient(circle,rgba(6,182,212,0.12) 0%,transparent 70%);pointer-events:none;z-index:0;}
+.wrap{max-width:900px;margin:0 auto;padding:0 20px;position:relative;z-index:1;}
+
+header{padding:36px 0 16px;display:flex;align-items:center;justify-content:space-between;}
+.logo{display:flex;align-items:center;gap:12px;}
+.logo-icon{width:42px;height:42px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:12px;display:grid;place-items:center;font-size:20px;box-shadow:0 0 24px var(--glow);}
+.logo-text{font-size:20px;font-weight:800;letter-spacing:-.5px;}
+.logo-text span{color:var(--accent);}
+.gbadge{background:var(--live);color:#fff;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;padding:4px 12px;border-radius:20px;display:flex;align-items:center;gap:6px;}
+.gbadge::before{content:'';width:6px;height:6px;background:#fff;border-radius:50%;animation:blink 1s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+.hero{padding:40px 0 28px;text-align:center;}
+.hero h1{font-size:clamp(30px,5vw,56px);font-weight:800;line-height:1.08;letter-spacing:-2px;margin-bottom:14px;}
+.g{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.hero p{color:var(--muted);font-size:16px;max-width:500px;margin:0 auto;line-height:1.6;}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px;}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center;}
+.stat-val{font-family:'Space Mono',monospace;font-size:26px;font-weight:700;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.stat-label{font-size:11px;color:var(--muted);margin-top:3px;}
+
+.tabs{display:flex;gap:4px;background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:5px;margin-bottom:20px;}
+.tab{flex:1;padding:10px 8px;border-radius:10px;border:none;background:transparent;color:var(--muted);font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;}
+.tab.active{background:var(--accent);color:#fff;box-shadow:0 0 16px var(--glow);}
+.tc{display:none;}
+.tc.active{display:block;animation:fu .3s ease;}
+@keyframes fu{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:26px;margin-bottom:20px;position:relative;overflow:hidden;}
+.panel::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent2));}
+.phd{display:flex;align-items:center;gap:12px;margin-bottom:20px;}
+.pico{width:44px;height:44px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;display:grid;place-items:center;font-size:20px;flex-shrink:0;}
+.ptitle{font-size:18px;font-weight:800;letter-spacing:-.4px;}
+.psub{font-size:12px;color:var(--muted);margin-top:2px;}
+
+.fg{margin-bottom:16px;}
+label{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:7px;}
+input,select{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:11px 14px;font-family:'Space Mono',monospace;font-size:13px;color:var(--text);outline:none;transition:border-color .2s,box-shadow .2s;}
+input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--glow);}
+input::placeholder{color:var(--muted);opacity:.5;}
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media(max-width:560px){.r2{grid-template-columns:1fr}}
+
+.infobox{background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.25);border-radius:10px;padding:13px 15px;font-size:13px;color:#a78bfa;display:flex;gap:10px;align-items:flex-start;margin-bottom:16px;}
+.infobox .ic{font-size:15px;flex-shrink:0;margin-top:1px;}
+
+.btn{padding:11px 20px;border-radius:9px;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:all .2s;display:inline-flex;align-items:center;gap:7px;}
+.btn-p{background:linear-gradient(135deg,var(--accent),#9333ea);color:#fff;box-shadow:0 4px 16px var(--glow);}
+.btn-p:hover{transform:translateY(-2px);box-shadow:0 8px 24px var(--glow);}
+.btn-sm{padding:8px 13px;font-size:12px;border-radius:7px;}
+.btn-o{background:transparent;color:var(--accent);border:1px solid var(--accent);}
+.btn-o:hover{background:rgba(124,58,237,.1);}
+.btn-g{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+.btn-g:hover{border-color:var(--accent);}
+.btn-d{background:rgba(239,68,68,.1);color:var(--live);border:1px solid rgba(239,68,68,.3);}
+.btn-d:hover{background:rgba(239,68,68,.2);}
+.btn-full{width:100%;justify-content:center;font-size:15px;padding:15px;}
+
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid var(--border);}
+.toggle-row:last-child{border-bottom:none;}
+.ti h4{font-size:13px;font-weight:700;}
+.ti p{font-size:11px;color:var(--muted);margin-top:2px;}
+.toggle{width:46px;height:25px;background:var(--border);border-radius:20px;position:relative;cursor:pointer;transition:background .3s;flex-shrink:0;}
+.toggle.on{background:var(--accent);}
+.toggle::after{content:'';position:absolute;top:3px;left:3px;width:19px;height:19px;background:#fff;border-radius:50%;transition:transform .3s;box-shadow:0 2px 4px rgba(0,0,0,.3);}
+.toggle.on::after{transform:translateX(21px);}
+
+.pills{display:flex;gap:7px;flex-wrap:wrap;}
+.pill{padding:7px 14px;border-radius:20px;background:var(--surface2);border:1px solid var(--border);font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;font-family:'Space Mono',monospace;}
+.pill:hover{border-color:var(--accent);}
+.pill.on{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 0 10px var(--glow);}
+
+/* ── CHANNEL CARDS ── */
+.add-row{display:flex;gap:10px;margin-bottom:12px;}
+.add-row input{flex:1;}
+.lookup-row{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;}
+
+.ch-list{display:flex;flex-direction:column;gap:10px;}
+.ch-card{background:var(--surface2);border:1px solid var(--border);border-radius:13px;padding:14px 16px;display:flex;align-items:center;gap:14px;transition:border-color .2s;animation:fu .25s ease;}
+.ch-card:hover{border-color:rgba(124,58,237,.4);}
+.ch-card.live{border-color:var(--live);box-shadow:0 0 14px rgba(239,68,68,.2);}
+.ch-av{width:44px;height:44px;border-radius:50%;background:var(--border);overflow:hidden;flex-shrink:0;display:grid;place-items:center;font-size:20px;border:2px solid var(--border);}
+.ch-av img{width:100%;height:100%;object-fit:cover;}
+.ch-av.lr{border-color:var(--live);box-shadow:0 0 0 2px rgba(239,68,68,.4);}
+.ch-info{flex:1;min-width:0;}
+.ch-name{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ch-id{font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);margin-top:2px;}
+.ch-st{display:flex;align-items:center;gap:6px;margin-top:5px;}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0;}
+.dot.live{background:var(--live);animation:blink 1.2s infinite;}
+.dot.ok{background:var(--success);}
+.dot.off{background:var(--muted);}
+.ch-stxt{font-size:11px;color:var(--muted);}
+.ch-stxt.live{color:var(--live);font-weight:700;}
+.ch-actions{display:flex;gap:6px;flex-shrink:0;}
+
+.empty{text-align:center;padding:40px 20px;color:var(--muted);}
+.empty .big{font-size:40px;margin-bottom:10px;}
+.empty p{font-size:13px;line-height:1.6;}
+
+/* LOG */
+.log-panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:18px;}
+.log-hd{padding:13px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:var(--surface2);}
+.log-hd-l{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;}
+.sdot{width:9px;height:9px;border-radius:50%;background:var(--muted);display:inline-block;}
+.sdot.on{background:var(--success);box-shadow:0 0 7px var(--success);animation:blink 1.5s infinite;}
+.log-body{font-family:'Space Mono',monospace;font-size:11.5px;padding:13px 20px;max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:3px;}
+.log-body::-webkit-scrollbar{width:3px;}
+.log-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+.ll{display:flex;gap:10px;animation:fu .2s ease;}
+.lt{color:var(--muted);flex-shrink:0;}
+.lm{color:var(--text);}
+.ll.s .lm{color:var(--success);}
+.ll.e .lm{color:var(--live);}
+.ll.w .lm{color:var(--warn);}
+
+/* DISCORD PREVIEW */
+.dc{background:#36393f;border-radius:12px;padding:15px 18px;}
+.dc-top{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.dc-av{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:50%;display:grid;place-items:center;font-size:15px;flex-shrink:0;}
+.dc-bot{font-weight:700;font-size:13px;color:#fff;}
+.dc-tag{font-size:10px;color:#5865F2;background:rgba(88,101,242,.2);padding:2px 6px;border-radius:4px;font-weight:600;margin-left:6px;}
+.dc-msg{font-size:13px;color:#dcddde;line-height:1.7;}
+.dc-msg .mn{color:#7289da;font-weight:600;}
+.dc-msg .bd{color:#fff;font-weight:700;}
+.dc-msg .lk{color:#00b0f4;}
+.dc-emb{margin-top:10px;background:#2f3136;border-left:3px solid var(--live);border-radius:4px;padding:10px 14px;}
+.dc-emb .et{color:#fff;font-size:12px;font-weight:700;margin-bottom:3px;}
+.dc-emb .ed{color:#b9bbbe;font-size:11px;}
+.dc-th{margin-top:8px;background:#1a1a1a;border-radius:4px;height:68px;display:flex;align-items:center;justify-content:center;color:#555;font-size:11px;gap:6px;}
+
+.ctrl-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;}
+.ctrl-row .btn{flex:1;min-width:120px;justify-content:center;}
+
+footer{text-align:center;padding:36px 0;color:var(--muted);font-size:11px;font-family:'Space Mono',monospace;}
+.hidden{display:none!important;}
 </style>
 </head>
 <body>
+<div class="orb1"></div><div class="orb2"></div>
+<div class="wrap">
 
-<div class="orb1"></div>
-<div class="orb2"></div>
-
-<div class="container">
-  <!-- HEADER -->
-  <header>
-    <div class="logo">
-      <div class="logo-icon">📡</div>
-      <div class="logo-text">Stream<span>Pulse</span></div>
-    </div>
-    <div class="badge-live" id="globalBadge">OFFLINE</div>
-  </header>
-
-  <!-- HERO -->
-  <div class="hero">
-    <h1>Kirim Notif <span class="gradient">Live Streaming</span><br>ke Discord Otomatis</h1>
-    <p>Setup webhook Discord sekali, dan StreamPulse akan mendeteksi & mengirimkan notifikasi setiap kali kamu mulai live.</p>
+<header>
+  <div class="logo">
+    <div class="logo-icon">📡</div>
+    <div class="logo-text">Stream<span>Pulse</span></div>
   </div>
+  <div class="gbadge" id="gbadge">OFFLINE</div>
+</header>
 
-  <!-- STATS -->
-  <div class="stats-row">
-    <div class="stat-card">
-      <div class="stat-val" id="statSent">0</div>
-      <div class="stat-label">Notif Terkirim</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-val" id="statChecks">0</div>
-      <div class="stat-label">Cek Live</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-val" id="statUptime">--</div>
-      <div class="stat-label">Status</div>
-    </div>
-  </div>
+<div class="hero">
+  <h1>Pantau <span class="g">Semua Channel</span><br>Live → Discord Otomatis</h1>
+  <p>Tambahkan channel YouTube siapapun — notif Discord otomatis terkirim tiap ada yang mulai live.</p>
+</div>
 
-  <!-- STEPPER -->
-  <div class="stepper" id="stepper">
-    <div class="step-item active" data-step="1" onclick="goStep(1)">
-      <div class="step-num">1</div>
-      <div class="step-label">Webhook</div>
-    </div>
-    <div class="step-line" id="line1"></div>
-    <div class="step-item" data-step="2" onclick="goStep(2)">
-      <div class="step-num">2</div>
-      <div class="step-label">Platform</div>
-    </div>
-    <div class="step-line" id="line2"></div>
-    <div class="step-item" data-step="3" onclick="goStep(3)">
-      <div class="step-num">3</div>
-      <div class="step-label">Pesan</div>
-    </div>
-    <div class="step-line" id="line3"></div>
-    <div class="step-item" data-step="4" onclick="goStep(4)">
-      <div class="step-num">4</div>
-      <div class="step-label">Mulai</div>
-    </div>
-  </div>
+<div class="stats">
+  <div class="stat"><div class="stat-val" id="stCh">0</div><div class="stat-label">Channel Dipantau</div></div>
+  <div class="stat"><div class="stat-val" id="stSent">0</div><div class="stat-label">Notif Terkirim</div></div>
+  <div class="stat"><div class="stat-val" id="stLive">0</div><div class="stat-label">Sedang Live</div></div>
+</div>
 
-  <!-- STEP 1: WEBHOOK -->
-  <div class="panel" id="step1">
-    <div class="panel-header">
-      <div class="panel-icon">🔗</div>
-      <div>
-        <div class="panel-title">Discord Webhook URL</div>
-        <div class="panel-sub">Hubungkan ke channel Discord tujuan</div>
+<div class="tabs">
+  <button class="tab active" onclick="goTab('channels')">📋 Channel</button>
+  <button class="tab" onclick="goTab('settings')">⚙️ Pengaturan</button>
+  <button class="tab" onclick="goTab('monitor')">🚀 Monitor</button>
+</div>
+
+<!-- ══ TAB CHANNELS ══ -->
+<div class="tc active" id="tc-channels">
+  <div class="panel">
+    <div class="phd">
+      <div class="pico">📺</div>
+      <div><div class="ptitle">Daftar Channel YouTube</div><div class="psub">Tambah channel siapapun untuk dipantau</div></div>
+    </div>
+
+    <div class="infobox">
+      <span class="ic">💡</span>
+      <div>Masukkan <strong>Channel ID</strong> (format <code>UCxxxx...</code>), link YouTube channel, atau <strong>@username</strong>. Klik <em>🔍 Cari</em> untuk resolve otomatis.</div>
+    </div>
+
+    <div class="add-row">
+      <input type="text" id="addInput" placeholder="UCxxxx... atau @namaChannel atau link YouTube" onkeydown="if(event.key==='Enter')doAdd()" />
+      <button class="btn btn-p btn-sm" onclick="doAdd()" id="addBtn">+ Tambah</button>
+    </div>
+    <div class="lookup-row">
+      <button class="btn btn-o btn-sm" onclick="doLookup()">🔍 Cari by Username / Link</button>
+      <span id="lookupSt" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+
+    <div class="ch-list" id="chList">
+      <div class="empty" id="emptyEl">
+        <div class="big">📭</div>
+        <p>Belum ada channel.<br>Tambahkan channel YouTube di atas.</p>
       </div>
-    </div>
-
-    <div class="info-box">
-      <span class="icon">💡</span>
-      <div>
-        Cara buat Webhook: Buka Discord → Channel Settings → Integrations → Webhooks → New Webhook → Copy URL
-      </div>
-    </div>
-
-    <div class="form-group">
-      <label>Webhook URL</label>
-      <input type="text" id="webhookUrl" placeholder="https://discord.com/api/webhooks/..." />
-    </div>
-
-    <div class="input-row">
-      <div class="form-group">
-        <label>Bot Name</label>
-        <input type="text" id="botName" placeholder="StreamPulse Bot" value="StreamPulse Bot" />
-      </div>
-      <div class="form-group">
-        <label>Avatar URL (opsional)</label>
-        <input type="text" id="botAvatar" placeholder="https://i.imgur.com/..." />
-      </div>
-    </div>
-
-    <div style="margin:20px 0 8px;border-top:1px solid var(--border);padding-top:20px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
-        <span style="font-size:18px">📺</span>
-        <span style="font-weight:700;font-size:15px">YouTube Data API v3</span>
-        <span class="tag tag-green" style="margin-left:4px">✅ Terhubung</span>
-      </div>
-    </div>
-
-    <div class="input-row">
-      <div class="form-group">
-        <label>YouTube API Key</label>
-        <input type="text" id="ytApiKey" placeholder="AIzaSy..." />
-      </div>
-      <div class="form-group">
-        <label>Channel ID YouTube</label>
-        <input type="text" id="ytChannelId" placeholder="UCxxxx..." />
-      </div>
-    </div>
-
-    <div style="margin-top:4px;margin-bottom:16px">
-      <button class="btn btn-outline" onclick="testYouTubeApi()" style="margin-right:12px">🔬 Test YouTube API</button>
-      <span id="ytApiStatus" style="font-size:13px;color:var(--muted)"></span>
-    </div>
-
-    <div style="margin-top:8px">
-      <button class="btn btn-outline" onclick="testWebhook()" style="margin-right:12px">🧪 Test Discord Webhook</button>
-      <span id="webhookStatus" style="font-size:13px;color:var(--muted)"></span>
-    </div>
-
-    <div class="nav-btns">
-      <button class="btn btn-primary" onclick="goStep(2)">Lanjut ke Platform →</button>
     </div>
   </div>
+</div>
 
-  <!-- STEP 2: PLATFORM -->
-  <div class="panel hidden" id="step2">
-    <div class="panel-header">
-      <div class="panel-icon">🎮</div>
-      <div>
-        <div class="panel-title">Pilih Platform Streaming</div>
-        <div class="panel-sub">Platform mana yang ingin kamu monitor</div>
-      </div>
+<!-- ══ TAB SETTINGS ══ -->
+<div class="tc" id="tc-settings">
+  <div class="panel">
+    <div class="phd"><div class="pico">🔑</div><div><div class="ptitle">YouTube & Discord</div><div class="psub">API Key dan Webhook URL</div></div></div>
+    <div class="r2">
+      <div class="fg"><label>YouTube Data API Key</label><input type="text" id="ytKey" placeholder="AIzaSy..." /></div>
+      <div class="fg"><label>Discord Webhook URL</label><input type="text" id="webhookUrl" placeholder="https://discord.com/api/webhooks/..." /></div>
     </div>
-
-    <div class="platform-grid" id="platformGrid">
-      <div class="platform-card" onclick="selectPlatform(this,'youtube')">
-        <div class="emoji">📺</div>
-        <div class="name">YouTube</div>
-      </div>
-      <div class="platform-card" onclick="selectPlatform(this,'twitch')">
-        <div class="emoji">💜</div>
-        <div class="name">Twitch</div>
-      </div>
-      <div class="platform-card" onclick="selectPlatform(this,'tiktok')">
-        <div class="emoji">🎵</div>
-        <div class="name">TikTok</div>
-      </div>
-      <div class="platform-card" onclick="selectPlatform(this,'instagram')">
-        <div class="emoji">📸</div>
-        <div class="name">Instagram</div>
-      </div>
-      <div class="platform-card" onclick="selectPlatform(this,'facebook')">
-        <div class="emoji">👥</div>
-        <div class="name">Facebook</div>
-      </div>
-      <div class="platform-card" onclick="selectPlatform(this,'custom')">
-        <div class="emoji">⚡</div>
-        <div class="name">Custom URL</div>
-      </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-o btn-sm" onclick="testYt()">🔬 Test YouTube API</button>
+      <button class="btn btn-o btn-sm" onclick="testWh()">🧪 Test Webhook</button>
     </div>
-
-    <div class="form-group" style="margin-top:20px">
-      <label id="channelLabel">Channel / Username</label>
-      <input type="text" id="channelInput" placeholder="Masukkan username atau channel ID" />
-    </div>
-
-    <div class="form-group" id="customUrlGroup" style="display:none">
-      <label>Custom Stream URL</label>
-      <input type="text" id="customUrl" placeholder="https://your-stream-url.com/live" />
-    </div>
-
-    <div class="nav-btns">
-      <button class="btn btn-secondary" onclick="goStep(1)">← Kembali</button>
-      <button class="btn btn-primary" onclick="goStep(3)" style="flex:1">Atur Pesan →</button>
-    </div>
+    <div id="stStatus" style="font-size:12px;color:var(--muted);margin-top:10px"></div>
   </div>
 
-  <!-- STEP 3: PESAN -->
-  <div class="panel hidden" id="step3">
-    <div class="panel-header">
-      <div class="panel-icon">✉️</div>
-      <div>
-        <div class="panel-title">Kustomisasi Pesan Notifikasi</div>
-        <div class="panel-sub">Atur tampilan notif yang dikirim ke Discord</div>
+  <div class="panel">
+    <div class="phd"><div class="pico">🤖</div><div><div class="ptitle">Bot & Notifikasi</div><div class="psub">Kustomisasi tampilan pesan</div></div></div>
+    <div class="r2">
+      <div class="fg"><label>Nama Bot</label><input type="text" id="botName" value="StreamPulse" /></div>
+      <div class="fg"><label>Avatar URL (opsional)</label><input type="text" id="botAv" placeholder="https://..." /></div>
+    </div>
+    <div class="fg">
+      <label>Mention</label>
+      <div class="pills" id="mentionPills">
+        <div class="pill" onclick="pickMention(this,'')">Tidak ada</div>
+        <div class="pill on" onclick="pickMention(this,'@everyone')">@everyone</div>
+        <div class="pill" onclick="pickMention(this,'@here')">@here</div>
       </div>
     </div>
-
-    <!-- Hidden fields kept for save/load compatibility -->
-    <input type="hidden" id="embedTitle" value="is live!" />
-    <input type="hidden" id="embedColor" value="#ff0000" />
-    <textarea id="msgBody" style="display:none"></textarea>
-
-    <div class="info-box" style="margin-bottom:20px">
-      <span class="icon">💡</span>
-      <div>Format notif: <strong>@everyone</strong> → <strong>[Channel] is live!</strong> → link <code>youtu.be/xxxxx</code><br>
-      Discord akan otomatis embed thumbnail & judul stream dari link YouTube.</div>
-    </div>
-
-    <div class="form-group">
-      <label>Mention (opsional)</label>
-      <div class="interval-pills">
-        <div class="pill" onclick="toggleMention(this,'none')">Tidak ada</div>
-        <div class="pill selected" onclick="toggleMention(this,'@everyone')">@everyone</div>
-        <div class="pill" onclick="toggleMention(this,'@here')">@here</div>
-      </div>
-    </div>
-
-    <div class="form-group" style="margin-top:20px">
+    <div class="fg" style="margin-top:16px">
       <label>Interval Cek Live</label>
-      <div class="interval-pills">
-        <div class="pill" onclick="selectInterval(this,30)">30 dtk</div>
-        <div class="pill selected" onclick="selectInterval(this,60)">1 menit</div>
-        <div class="pill" onclick="selectInterval(this,300)">5 menit</div>
-        <div class="pill" onclick="selectInterval(this,600)">10 menit</div>
+      <div class="pills" id="intPills">
+        <div class="pill" onclick="pickInt(this,30)">30 dtk</div>
+        <div class="pill on" onclick="pickInt(this,60)">1 menit</div>
+        <div class="pill" onclick="pickInt(this,300)">5 menit</div>
+        <div class="pill" onclick="pickInt(this,600)">10 menit</div>
       </div>
     </div>
-
-    <!-- TOGGLE SETTINGS -->
-    <div style="margin-top:24px">
-      <div class="toggle-row">
-        <div class="toggle-info">
-          <h4>🔕 Anti-Spam</h4>
-          <p>Tidak kirim notif ulang selama masih live</p>
-        </div>
-        <div class="toggle on" id="toggleAntiSpam" onclick="this.classList.toggle('on')"></div>
-      </div>
-      <div class="toggle-row">
-        <div class="toggle-info">
-          <h4>📴 Notif Selesai Live</h4>
-          <p>Kirim pesan saat streaming berakhir</p>
-        </div>
-        <div class="toggle on" id="toggleOffNotif" onclick="this.classList.toggle('on')"></div>
-      </div>
-      <div class="toggle-row">
-        <div class="toggle-info">
-          <h4>🔊 Auto-Start saat dibuka</h4>
-          <p>Langsung mulai monitor saat halaman dibuka</p>
-        </div>
-        <div class="toggle" id="toggleAutoStart" onclick="this.classList.toggle('on')"></div>
-      </div>
+    <div style="margin-top:20px">
+      <div class="toggle-row"><div class="ti"><h4>🔕 Anti-Spam</h4><p>Tidak kirim notif ulang selama masih live</p></div><div class="toggle on" id="togAS" onclick="this.classList.toggle('on');saveAll()"></div></div>
+      <div class="toggle-row"><div class="ti"><h4>📴 Notif Selesai Live</h4><p>Kirim pesan saat stream berakhir</p></div><div class="toggle on" id="togOff" onclick="this.classList.toggle('on');saveAll()"></div></div>
     </div>
 
-    <!-- PREVIEW -->
-    <div style="margin-top:24px">
-      <label>Preview Pesan Discord</label>
-      <div class="discord-preview">
-        <div class="discord-webhook-header">
-          <div class="bot-avatar">📡</div>
-          <div>
-            <span class="bot-name" id="previewBotName">StreamPulse Bot</span>
-            <span class="bot-tag" style="margin-left:6px">BOT</span>
-          </div>
+    <div style="margin-top:22px">
+      <label>Preview Notif Discord</label>
+      <div class="dc">
+        <div class="dc-top">
+          <div class="dc-av">📡</div>
+          <div><span class="dc-bot" id="pvBot">StreamPulse</span><span class="dc-tag">BOT</span></div>
         </div>
-        <!-- Simple format preview matching screenshot -->
-        <div style="font-size:13px;color:#dcddde;line-height:1.8" id="embedPreview">
-          <div id="previewMention" style="color:#7289da;font-weight:600">@everyone</div>
-          <div><strong id="previewChannelName" style="color:#fff">YourChannel</strong> <span id="previewLiveText">is live!</span></div>
-          <div id="previewLink" style="color:#00b0f4;margin-top:2px">https://youtu.be/xxxxxxx</div>
+        <div class="dc-msg">
+          <span class="mn" id="pvMention">@everyone</span><br>
+          <span class="bd" id="pvName">ChannelName</span> <span>is live!</span><br>
+          <span class="lk">https://youtu.be/xxxxxxx</span>
         </div>
-        <!-- Auto-embed thumbnail preview -->
-        <div style="margin-top:12px;background:#2f3136;border-radius:4px;padding:12px;border-left:4px solid #ff0000">
-          <div style="font-size:11px;color:#b9bbbe;margin-bottom:4px">YouTube</div>
-          <div style="color:#fff;font-weight:700;font-size:13px" id="previewTitle">Live Stream Title</div>
-          <div style="margin-top:8px;background:#1a1a1a;border-radius:4px;height:80px;display:flex;align-items:center;justify-content:center;color:#666;font-size:11px">🖼 Thumbnail otomatis muncul dari YouTube</div>
+        <div class="dc-emb">
+          <div class="et">Stream Title</div>
+          <div class="ed">YouTube · Live</div>
+          <div class="dc-th">🖼️ Thumbnail otomatis dari YouTube</div>
         </div>
       </div>
-    </div>
-
-    <div class="nav-btns">
-      <button class="btn btn-secondary" onclick="goStep(2)">← Kembali</button>
-      <button class="btn btn-primary" onclick="goStep(4)" style="flex:1">Lihat Dashboard →</button>
     </div>
   </div>
+</div>
 
-  <!-- STEP 4: DASHBOARD -->
-  <div class="panel hidden" id="step4">
-    <div class="panel-header">
-      <div class="panel-icon">🚀</div>
-      <div>
-        <div class="panel-title">Monitor Dashboard</div>
-        <div class="panel-sub">Kontrol & monitoring notifikasi live</div>
+<!-- ══ TAB MONITOR ══ -->
+<div class="tc" id="tc-monitor">
+  <div class="panel">
+    <div class="phd"><div class="pico">🚀</div><div><div class="ptitle">Monitor Dashboard</div><div class="psub" id="monSub">Belum aktif</div></div></div>
+
+    <div class="ctrl-row">
+      <button class="btn btn-p" id="btnStart" onclick="startMon()">▶ Mulai Monitor</button>
+      <button class="btn btn-d" id="btnStop" onclick="stopMon()" disabled>⏹ Stop</button>
+      <button class="btn btn-g btn-sm" onclick="checkAll()">🔄 Cek Sekarang</button>
+      <button class="btn btn-o btn-sm" onclick="sendTest()">📨 Test Notif</button>
+    </div>
+
+    <div id="liveSection" class="hidden" style="margin-bottom:18px">
+      <label style="margin-bottom:10px">🔴 Sedang Live</label>
+      <div class="ch-list" id="liveList"></div>
+    </div>
+
+    <div class="log-panel">
+      <div class="log-hd">
+        <div class="log-hd-l"><span class="sdot" id="sdot"></span><span id="stText">Belum aktif</span></div>
+        <button onclick="clearLog()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px">🗑 Clear</button>
       </div>
-    </div>
-
-    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">
-      <button class="btn btn-primary" id="btnStart" onclick="startMonitor()" style="flex:1;min-width:140px">▶ Mulai Monitor</button>
-      <button class="btn btn-danger" id="btnStop" onclick="stopMonitor()" style="flex:1;min-width:140px" disabled>⏹ Stop Monitor</button>
-      <button class="btn btn-outline" onclick="sendTestNow()" style="flex:1;min-width:140px">📨 Kirim Test Notif</button>
-    </div>
-
-    <div style="margin-bottom:8px;display:flex;align-items:center;gap:10px">
-      <span class="tag tag-purple">📡 Monitor Status</span>
-    </div>
-
-    <!-- LOG -->
-    <div class="status-panel">
-      <div class="status-header">
-        <div class="status-title">
-          <span class="status-dot" id="statusDot"></span>
-          <span id="statusText">Belum aktif</span>
-        </div>
-        <button onclick="clearLog()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px">🗑 Clear</button>
+      <div class="log-body" id="logBody">
+        <div class="ll"><span class="lt">[--:--:--]</span><span class="lm">StreamPulse siap. Tambah channel lalu tekan Mulai Monitor.</span></div>
       </div>
-      <div class="log-area" id="logArea">
-        <div class="log-line">
-          <span class="log-time">[--:--:--]</span>
-          <span class="log-msg">StreamPulse siap. Tekan "Mulai Monitor" untuk memulai.</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="nav-btns">
-      <button class="btn btn-secondary" onclick="goStep(3)">← Ubah Pengaturan</button>
     </div>
   </div>
+</div>
 
-  <footer>
-    <p>StreamPulse v1.0 — Dibuat dengan ❤️ untuk streamer Indonesia</p>
-    <p style="margin-top:6px;opacity:0.5">Notifikasi dikirim via Discord Webhook API</p>
-  </footer>
+<footer>StreamPulse v2.0 · Multi-Channel YouTube Live Notifier · Discord Webhook</footer>
 </div>
 
 <script>
-// ─── CONFIG ──────────────────────────────────────────
-const YT_API_KEY    = 'AIzaSyCkq70-Sh0bAxVr_Vvonq6uWeZaP9QnGUQ';
-const YT_CHANNEL_ID = 'UCIyBeSbK8L2XL8-72p8N3qQ';
+/* ══════════════════════════════════
+   DEFAULTS — your credentials
+══════════════════════════════════ */
+const DEF_KEY = 'AIzaSyCkq70-Sh0bAxVr_Vvonq6uWeZaP9QnGUQ';
+const DEF_CH  = 'UCIyBeSbK8L2XL8-72p8N3qQ';
 
-// ─── STATE ───────────────────────────────────────────
-let state = {
-  currentStep: 1,
-  platform: 'youtube',
-  intervalSec: 60,
-  mention: '@everyone',
-  monitorInterval: null,
-  isLive: false,
-  sentCount: 0,
-  checkCount: 0,
-  startTime: null,
-  monitorActive: false,
-  // Live stream data from YouTube API
-  liveData: null,
-};
+/* ══════════════════════════════════
+   STATE
+══════════════════════════════════ */
+let channels  = [];   // [{id,name,thumb,isLive,lastNotif,enabled}]
+let cfg = { ytKey:DEF_KEY, webhookUrl:'', botName:'StreamPulse', botAv:'', mention:'@everyone', intervalSec:60 };
+let isMonitoring = false;
+let monTimer = null;
+let sentCount = 0;
 
-// ─── STEP NAVIGATION ─────────────────────────────────
-function goStep(n) {
-  for (let i = 1; i <= 4; i++) {
-    document.getElementById('step'+i).classList.add('hidden');
-  }
-  document.getElementById('step'+n).classList.remove('hidden');
-  state.currentStep = n;
-  updateStepper(n);
+/* ══════════════════════════════════
+   TABS
+══════════════════════════════════ */
+function goTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    t.classList.toggle('active',['channels','settings','monitor'][i]===name);
+  });
+  document.querySelectorAll('.tc').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tc-'+name).classList.add('active');
   updatePreview();
 }
 
-function updateStepper(active) {
-  document.querySelectorAll('.step-item').forEach((el, idx) => {
-    const num = idx + 1;
-    el.classList.remove('active','done');
-    if (num < active) el.classList.add('done');
-    else if (num === active) el.classList.add('active');
-  });
-  for (let i = 1; i <= 3; i++) {
-    const line = document.getElementById('line'+i);
-    if (i < active) line.classList.add('done');
-    else line.classList.remove('done');
-  }
+/* ══════════════════════════════════
+   CHANNEL: PARSE INPUT
+══════════════════════════════════ */
+function parseInput(raw) {
+  raw = raw.trim();
+  if (/^UC[\w-]{22}$/.test(raw)) return {type:'id',val:raw};
+  const m1 = raw.match(/youtube\.com\/channel\/(UC[\w-]{22})/);
+  if (m1) return {type:'id',val:m1[1]};
+  const m2 = raw.match(/youtube\.com\/@([\w.-]+)/);
+  if (m2) return {type:'handle',val:m2[1]};
+  const m3 = raw.match(/youtube\.com\/(?:c\/|user\/)([\w.-]+)/);
+  if (m3) return {type:'handle',val:m3[1]};
+  if (raw.startsWith('@')) return {type:'handle',val:raw.slice(1)};
+  if (raw.includes('youtube.com') || raw.includes('youtu.be')) return {type:'handle',val:raw};
+  return {type:'handle',val:raw};
 }
 
-// ─── PLATFORM SELECT ──────────────────────────────────
-function selectPlatform(el, name) {
-  document.querySelectorAll('.platform-card').forEach(c => c.classList.remove('selected'));
-  el.classList.add('selected');
-  state.platform = name;
-
-  const labels = {
-    youtube: 'Channel ID / Username YouTube',
-    twitch: 'Username Twitch',
-    tiktok: 'Username TikTok',
-    instagram: 'Username Instagram',
-    facebook: 'Page Username Facebook',
-    custom: 'Nama Stream',
-  };
-  document.getElementById('channelLabel').textContent = labels[name] || 'Channel / Username';
-
-  const customGroup = document.getElementById('customUrlGroup');
-  customGroup.style.display = name === 'custom' ? 'block' : 'none';
-  updatePreview();
+/* ══════════════════════════════════
+   CHANNEL: RESOLVE VIA API
+══════════════════════════════════ */
+async function resolveHandle(handle) {
+  const key = document.getElementById('ytKey').value.trim() || DEF_KEY;
+  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(handle)}&type=channel&maxResults=1&key=${key}`;
+  const r = await fetch(url);
+  const d = await r.json();
+  if (d.error) throw new Error(d.error.message);
+  if (!d.items?.length) throw new Error('Channel tidak ditemukan untuk: '+handle);
+  const it = d.items[0];
+  return {id:it.snippet.channelId, name:it.snippet.channelTitle, thumb:it.snippet.thumbnails?.default?.url||''};
 }
 
-// ─── INTERVAL SELECT ─────────────────────────────────
-function selectInterval(el, sec) {
-  document.querySelectorAll('.interval-pills .pill').forEach(p => {
-    if (p.closest('.form-group') === el.closest('.form-group')) p.classList.remove('selected');
-  });
-  el.classList.add('selected');
-  state.intervalSec = sec;
+async function resolveById(id) {
+  const key = document.getElementById('ytKey').value.trim() || DEF_KEY;
+  const url = `https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${id}&key=${key}`;
+  const r = await fetch(url);
+  const d = await r.json();
+  if (d.error) throw new Error(d.error.message);
+  if (!d.items?.length) throw new Error('Channel ID tidak ditemukan: '+id);
+  const sn = d.items[0].snippet;
+  return {id, name:sn.title, thumb:sn.thumbnails?.default?.url||''};
 }
 
-// ─── MENTION ────────────────────────────────────────
-function toggleMention(el, val) {
-  el.closest('.form-group').querySelectorAll('.pill').forEach(p => p.classList.remove('selected'));
-  el.classList.add('selected');
-  state.mention = val === 'none' ? '' : val;
+async function resolveAny(raw) {
+  const parsed = parseInput(raw);
+  return parsed.type === 'id' ? await resolveById(parsed.val) : await resolveHandle(parsed.val);
 }
 
-// ─── PREVIEW UPDATE ──────────────────────────────────
-function updatePreview() {
-  const name     = document.getElementById('channelInput')?.value || 'YourChannel';
-  const botName  = document.getElementById('botName')?.value || 'NotifyMe';
-  const mention  = state.mention || '@everyone';
-
-  // Update bot name
-  const previewBotEl = document.getElementById('previewBotName');
-  if (previewBotEl) previewBotEl.textContent = botName;
-
-  // Update simple content preview
-  const mentionEl = document.getElementById('previewMention');
-  const channelEl = document.getElementById('previewChannelName');
-  const linkEl    = document.getElementById('previewLink');
-  const titleEl   = document.getElementById('previewTitle');
-
-  if (mentionEl) mentionEl.textContent = mention || '';
-  if (channelEl) channelEl.textContent = name;
-  if (linkEl)    linkEl.textContent    = `https://youtu.be/xxxxxxx`;
-  if (titleEl)   titleEl.textContent   = 'Live Stream Title';
-}
-
-document.addEventListener('input', updatePreview);
-
-// ─── WEBHOOK TEST ─────────────────────────────────────
-async function testWebhook() {
-  const url = document.getElementById('webhookUrl').value.trim();
-  const status = document.getElementById('webhookStatus');
-
-  if (!url) { status.style.color='var(--live)'; status.textContent = '❌ Masukkan Webhook URL dulu!'; return; }
-  if (!url.includes('discord.com/api/webhooks')) { status.style.color='var(--live)'; status.textContent = '❌ URL tidak valid!'; return; }
-
-  status.style.color='var(--muted)'; status.textContent = '⏳ Mengirim test...';
-
-  const payload = {
-    username: document.getElementById('botName').value || 'StreamPulse Bot',
-    avatar_url: document.getElementById('botAvatar').value || undefined,
-    content: '👋 **StreamPulse Test** — Webhook berhasil terhubung! ✅',
-    embeds: [{
-      title: '🧪 Webhook Test Berhasil',
-      description: 'StreamPulse telah berhasil terhubung ke channel ini. Notifikasi live akan dikirim ke sini.',
-      color: 0x7c3aed,
-      footer: { text: 'StreamPulse v1.0' },
-      timestamp: new Date().toISOString()
-    }]
-  };
-
+/* ══════════════════════════════════
+   CHANNEL: ADD
+══════════════════════════════════ */
+async function doAdd() {
+  const raw = document.getElementById('addInput').value.trim();
+  if (!raw) return;
+  const btn = document.getElementById('addBtn');
+  btn.textContent = '⏳'; btn.disabled = true;
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (res.ok || res.status === 204) {
-      status.style.color='var(--success)'; status.textContent = '✅ Berhasil! Cek channel Discord kamu.';
-    } else {
-      status.style.color='var(--live)'; status.textContent = `❌ Error ${res.status}: ${res.statusText}`;
+    const info = await resolveAny(raw);
+    if (channels.find(c=>c.id===info.id)) {
+      addLog(`⚠️ "${info.name}" sudah ada dalam daftar.`,'w'); return;
     }
+    channels.push({id:info.id,name:info.name,thumb:info.thumb,isLive:false,lastNotif:0,enabled:true});
+    document.getElementById('addInput').value = '';
+    renderCh(); saveAll();
+    addLog(`✅ Ditambahkan: ${info.name} (${info.id})`,'s');
   } catch(e) {
-    status.style.color='var(--warn)'; status.textContent = '⚠️ Koneksi gagal. Cek URL & koneksi internet.';
+    addLog(`❌ Gagal tambah: ${e.message}`,'e');
+  } finally { btn.textContent='+ Tambah'; btn.disabled=false; }
+}
+
+async function doLookup() {
+  const raw = document.getElementById('addInput').value.trim();
+  const el = document.getElementById('lookupSt');
+  if (!raw) { el.style.color='var(--warn)'; el.textContent='⚠️ Ketik nama atau @handle dulu'; return; }
+  el.style.color='var(--muted)'; el.textContent='🔍 Mencari...';
+  try {
+    const info = await resolveAny(raw);
+    el.style.color='var(--success)';
+    el.textContent=`✅ "${info.name}" → ${info.id}`;
+    document.getElementById('addInput').value = info.id;
+  } catch(e) {
+    el.style.color='var(--live)'; el.textContent='❌ '+e.message;
   }
 }
 
-// ─── SEND DISCORD NOTIFICATION ──────────────────────
-// Format: simple seperti screenshot — mention, "name is live!", link pendek, thumbnail otomatis dari Discord
-async function sendDiscordNotif(isLiveStart = true, overrideLiveData = null) {
-  const webhookUrl = document.getElementById('webhookUrl').value.trim();
-  if (!webhookUrl) return;
+function removeChannel(id) {
+  channels = channels.filter(c=>c.id!==id);
+  renderCh(); saveAll(); updateStats();
+}
 
-  const live = overrideLiveData || state.liveData;
-  const channelName = live?.channelTitle || document.getElementById('channelInput').value || 'Streamer';
-  const videoId     = live?.videoId || null;
-  // Gunakan youtu.be short link agar thumbnail embed muncul otomatis di Discord
-  const streamUrl   = videoId
-    ? `https://youtu.be/${videoId}`
-    : (live?.streamUrl || `https://youtube.com/channel/${YT_CHANNEL_ID}/live`);
+function toggleEnable(id) {
+  const ch = channels.find(c=>c.id===id);
+  if (ch) { ch.enabled=!ch.enabled; renderCh(); saveAll(); }
+}
 
-  const mention = state.mention ? state.mention + '\n' : '';
-  const botName = document.getElementById('botName').value.trim() || 'NotifyMe';
-  const avatarUrl = document.getElementById('botAvatar').value.trim();
+/* ══════════════════════════════════
+   CHANNEL: RENDER
+══════════════════════════════════ */
+function renderCh() {
+  const list = document.getElementById('chList');
+  list.innerHTML = '';
+  if (!channels.length) {
+    list.innerHTML = `<div class="empty"><div class="big">📭</div><p>Belum ada channel.<br>Tambahkan channel YouTube di atas.</p></div>`;
+    updateStats(); return;
+  }
+  channels.forEach(ch => {
+    const card = document.createElement('div');
+    card.className = 'ch-card'+(ch.isLive?' live':'');
+    card.innerHTML = `
+      <div class="ch-av ${ch.isLive?'lr':''}">${ch.thumb?`<img src="${ch.thumb}" onerror="this.parentElement.textContent='📺'">`:'📺'}</div>
+      <div class="ch-info">
+        <div class="ch-name">${esc(ch.name)}</div>
+        <div class="ch-id">${ch.id}</div>
+        <div class="ch-st">
+          <span class="dot ${ch.isLive?'live':ch.enabled?'ok':'off'}"></span>
+          <span class="ch-stxt ${ch.isLive?'live':''}">${ch.isLive?'🔴 LIVE SEKARANG':ch.enabled?'Dipantau':'Nonaktif'}</span>
+        </div>
+      </div>
+      <div class="ch-actions">
+        <button class="btn btn-g btn-sm" onclick="toggleEnable('${ch.id}')" title="${ch.enabled?'Nonaktifkan':'Aktifkan'}">${ch.enabled?'⏸':'▶'}</button>
+        <button class="btn btn-d btn-sm" onclick="removeChannel('${ch.id}')" title="Hapus">🗑</button>
+      </div>`;
+    list.appendChild(card);
+  });
+  updateStats();
+}
 
-  let payload;
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-  if (isLiveStart) {
-    // Format persis seperti screenshot:
-    // @everyone
-    // **name** is live!
-    // https://youtu.be/xxxxx   ← Discord auto-embed thumbnail dari link ini
-    payload = {
-      username: botName,
-      content: `${mention}**${channelName}** is live!\n${streamUrl}`,
-    };
+/* ══════════════════════════════════
+   YOUTUBE API: CEK LIVE
+══════════════════════════════════ */
+async function checkLiveCh(ch) {
+  const key = document.getElementById('ytKey').value.trim() || DEF_KEY;
+  const r = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${ch.id}&eventType=live&type=video&maxResults=1&key=${key}`);
+  const d = await r.json();
+  if (d.error) throw new Error(d.error.message);
+  if (d.items?.length) {
+    const it = d.items[0];
+    return {isLive:true, videoId:it.id.videoId, title:it.snippet.title, channelTitle:it.snippet.channelTitle, streamUrl:`https://youtu.be/${it.id.videoId}`};
+  }
+  return {isLive:false};
+}
+
+/* ══════════════════════════════════
+   DISCORD: SEND NOTIF
+   Format: @everyone\n**Name** is live!\nhttps://youtu.be/xxxx
+══════════════════════════════════ */
+async function sendNotif(ch, liveData, isStart) {
+  const wh = document.getElementById('webhookUrl').value.trim();
+  if (!wh) { addLog('⚠️ Webhook URL belum diisi!','w'); return; }
+  const mention  = cfg.mention;
+  const name     = liveData?.channelTitle || ch.name;
+  const url      = liveData?.streamUrl || `https://youtube.com/channel/${ch.id}/live`;
+  const botName  = document.getElementById('botName').value.trim() || 'StreamPulse';
+  const botAv    = document.getElementById('botAv').value.trim();
+
+  const content = isStart
+    ? (mention?mention+'\n':'') + `**${name}** is live!\n${url}`
+    : `📴 **${name}** has ended the stream.`;
+
+  const payload = {username:botName, content};
+  if (botAv) payload.avatar_url = botAv;
+
+  const res = await fetch(wh, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  if (res.ok||res.status===204) {
+    sentCount++;
+    document.getElementById('stSent').textContent = sentCount;
+    addLog(`✅ Notif: "${name} is live!" → ${url}`,'s');
   } else {
-    payload = {
-      username: botName,
-      content: `📴 **${channelName}** has ended the stream.`,
-    };
-  }
-
-  if (avatarUrl) payload.avatar_url = avatarUrl;
-
-  try {
-    const res = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (res.ok || res.status === 204) {
-      state.sentCount++;
-      document.getElementById('statSent').textContent = state.sentCount;
-      addLog(isLiveStart ? `✅ Notif LIVE terkirim! "${channelName} is live!" + ${streamUrl}` : '📴 Notif selesai live terkirim.', 'success');
-    } else {
-      const errBody = await res.text();
-      addLog(`❌ Gagal kirim notif Discord (${res.status}): ${errBody.substring(0,80)}`, 'error');
-    }
-  } catch(e) {
-    addLog('❌ Error koneksi Discord: ' + e.message, 'error');
+    addLog(`❌ Discord error ${res.status}`,'e');
   }
 }
 
-// ─── MONITOR ─────────────────────────────────────────
-function startMonitor() {
-  const webhookUrl = document.getElementById('webhookUrl').value.trim();
-  if (!webhookUrl) { alert('⚠️ Isi Discord Webhook URL dulu di langkah 1!'); goStep(1); return; }
-  if (!state.platform) { alert('⚠️ Pilih platform streaming dulu di langkah 2!'); goStep(2); return; }
-
-  state.monitorActive = true;
-  state.startTime = Date.now();
-  state.isLive = false;
-
+/* ══════════════════════════════════
+   MONITOR
+══════════════════════════════════ */
+function startMon() {
+  if (!document.getElementById('webhookUrl').value.trim()) {
+    alert('⚠️ Isi Discord Webhook URL di tab Pengaturan!'); goTab('settings'); return;
+  }
+  if (!channels.filter(c=>c.enabled).length) {
+    alert('⚠️ Tambah channel dulu di tab Channel!'); goTab('channels'); return;
+  }
+  isMonitoring = true;
   document.getElementById('btnStart').disabled = true;
-  document.getElementById('btnStop').disabled = false;
-  document.getElementById('statusDot').classList.add('active');
-  document.getElementById('statusText').textContent = 'Aktif — Memantau live status...';
-  document.getElementById('globalBadge').textContent = 'MONITORING';
-  document.getElementById('globalBadge').style.background = 'var(--success)';
-  document.getElementById('statUptime').textContent = 'Aktif';
-
-  addLog(`🚀 Monitor dimulai! Platform: ${state.platform.toUpperCase()} | Interval: ${state.intervalSec}s`, 'success');
-  addLog(`📡 Memantau channel: ${document.getElementById('channelInput').value || '(belum diisi)'}`, '');
-
-  checkLive(); // immediate first check
-  state.monitorInterval = setInterval(checkLive, state.intervalSec * 1000);
+  document.getElementById('btnStop').disabled  = false;
+  document.getElementById('sdot').classList.add('on');
+  document.getElementById('gbadge').textContent = 'MONITORING';
+  document.getElementById('gbadge').style.background = 'var(--success)';
+  const n = channels.filter(c=>c.enabled).length;
+  document.getElementById('monSub').textContent = `Memantau ${n} channel · Interval ${cfg.intervalSec}s`;
+  document.getElementById('stText').textContent = `Aktif — ${n} channel`;
+  addLog(`🚀 Monitor dimulai! ${n} channel aktif`,'s');
+  channels.filter(c=>c.enabled).forEach(c=>addLog(`   📺 ${c.name}`,''));
+  checkAll();
+  monTimer = setInterval(checkAll, cfg.intervalSec*1000);
 }
 
-function stopMonitor() {
-  state.monitorActive = false;
-  clearInterval(state.monitorInterval);
-  state.monitorInterval = null;
-
+function stopMon() {
+  isMonitoring = false;
+  clearInterval(monTimer); monTimer = null;
   document.getElementById('btnStart').disabled = false;
-  document.getElementById('btnStop').disabled = true;
-  document.getElementById('statusDot').classList.remove('active');
-  document.getElementById('statusText').textContent = 'Dihentikan';
-  document.getElementById('globalBadge').textContent = 'OFFLINE';
-  document.getElementById('globalBadge').style.background = 'var(--live)';
-  document.getElementById('statUptime').textContent = 'Stop';
-
-  addLog('⏹ Monitor dihentikan.', 'warn');
+  document.getElementById('btnStop').disabled  = true;
+  document.getElementById('sdot').classList.remove('on');
+  document.getElementById('stText').textContent = 'Dihentikan';
+  document.getElementById('gbadge').textContent = 'OFFLINE';
+  document.getElementById('gbadge').style.background = 'var(--live)';
+  document.getElementById('monSub').textContent = 'Belum aktif';
+  addLog('⏹ Monitor dihentikan.','w');
 }
 
-// ─── TEST YOUTUBE API ─────────────────────────────────
-async function testYouTubeApi() {
-  const apiKey = document.getElementById('ytApiKey').value.trim();
-  const chId   = document.getElementById('ytChannelId').value.trim();
-  const status = document.getElementById('ytApiStatus');
+async function checkAll() {
+  const active = channels.filter(c=>c.enabled);
+  if (!active.length) return;
+  addLog(`🔍 Mengecek ${active.length} channel...`,'');
+  let liveCount = 0;
 
-  if (!apiKey) { status.style.color='var(--live)'; status.textContent = '❌ Masukkan API Key dulu!'; return; }
-  if (!chId)   { status.style.color='var(--live)'; status.textContent = '❌ Masukkan Channel ID dulu!'; return; }
+  for (const ch of active) {
+    try {
+      const res = await checkLiveCh(ch);
+      const wasLive = ch.isLive;
+      const antiSpam = document.getElementById('togAS').classList.contains('on');
+      const offNotif = document.getElementById('togOff').classList.contains('on');
 
-  status.style.color='var(--muted)'; status.textContent = '⏳ Menghubungi YouTube API...';
-
-  try {
-    const chRes = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${chId}&key=${apiKey}`);
-    const chData = await chRes.json();
-    if (chData.error) throw new Error(chData.error.message);
-    if (!chData.items || chData.items.length === 0) throw new Error('Channel ID tidak ditemukan');
-
-    const ch = chData.items[0];
-    const chName = ch.snippet.title;
-    const subs = parseInt(ch.statistics.subscriberCount || 0).toLocaleString('id-ID');
-
-    const liveRes = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${chId}&eventType=live&type=video&key=${apiKey}`);
-    const liveData = await liveRes.json();
-    const isLive = liveData.items && liveData.items.length > 0;
-
-    status.style.color='var(--success)';
-    status.textContent = `✅ "${chName}" (${subs} subs) — ${isLive ? '🔴 Sedang LIVE!' : '💤 Tidak live'}`;
-
-    // Auto-fill channel info
-    document.getElementById('channelInput').value = chId;
-  } catch(e) {
-    status.style.color='var(--live)';
-    status.textContent = '❌ Error: ' + e.message;
-  }
-}
-
-// ─── YOUTUBE API: CEK LIVE STATUS ────────────────────
-async function checkYouTubeLive(channelId) {
-  const apiKey = document.getElementById('ytApiKey').value.trim() || YT_API_KEY;
-  const chId   = channelId || document.getElementById('channelInput').value.trim() || YT_CHANNEL_ID;
-
-  // Search for active live broadcast on this channel
-  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${chId}&eventType=live&type=video&key=${apiKey}`;
-
-  const res = await fetch(url);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `HTTP ${res.status}`);
-  }
-  const data = await res.json();
-
-  if (data.items && data.items.length > 0) {
-    const item = data.items[0];
-    return {
-      isLive: true,
-      videoId: item.id.videoId,
-      title: item.snippet.title,
-      channelTitle: item.snippet.channelTitle,
-      description: item.snippet.description,
-      thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url,
-      streamUrl: `https://www.youtube.com/watch?v=${item.id.videoId}`,
-      publishedAt: item.snippet.publishedAt,
-    };
-  }
-  return { isLive: false };
-}
-
-// ─── REAL checkLive USING YOUTUBE API ─────────────────
-async function checkLive() {
-  if (!state.monitorActive) return;
-  state.checkCount++;
-  document.getElementById('statChecks').textContent = state.checkCount;
-
-  const chId = document.getElementById('channelInput').value.trim() || YT_CHANNEL_ID;
-  addLog(`🔍 Cek #${state.checkCount}: Query YouTube API untuk channel ${chId.substring(0,12)}...`, '');
-
-  try {
-    const result = await checkYouTubeLive(chId);
-
-    if (result.isLive && !state.isLive) {
-      // Baru saja mulai live
-      state.isLive = true;
-      state.liveData = result;
-
-      document.getElementById('statusText').textContent = '🔴 LIVE TERDETEKSI!';
-      document.getElementById('globalBadge').textContent = '🔴 LIVE';
-      document.getElementById('globalBadge').style.background = 'var(--live)';
-
-      addLog(`🔴 LIVE TERDETEKSI! "${result.title}"`, 'success');
-      addLog(`🎬 Video ID: ${result.videoId}`, 'success');
-      addLog(`🔗 ${result.streamUrl}`, 'success');
-      addLog(`📨 Mengirim notifikasi ke Discord...`, '');
-      await sendDiscordNotif(true);
-
-    } else if (!result.isLive && state.isLive) {
-      // Stream selesai
-      state.isLive = false;
-      const prevData = state.liveData;
-      state.liveData = null;
-
-      document.getElementById('statusText').textContent = 'Aktif — Memantau live status...';
-      document.getElementById('globalBadge').textContent = 'MONITORING';
-      document.getElementById('globalBadge').style.background = 'var(--success)';
-      addLog('📴 Stream telah selesai.', 'warn');
-
-      const offNotif = document.getElementById('toggleOffNotif').classList.contains('on');
-      if (offNotif) await sendDiscordNotif(false, prevData);
-
-    } else if (result.isLive && state.isLive) {
-      const antiSpam = document.getElementById('toggleAntiSpam').classList.contains('on');
-      if (antiSpam) {
-        addLog(`🔴 Masih LIVE: "${result.title}" — Anti-spam aktif, skip notif.`, 'warn');
+      if (res.isLive && !wasLive) {
+        ch.isLive = true;
+        addLog(`🔴 LIVE: ${ch.name} — "${res.title}"`,'s');
+        addLog(`   🔗 ${res.streamUrl}`,'s');
+        await sendNotif(ch, res, true);
+        ch.lastNotif = Date.now();
+      } else if (!res.isLive && wasLive) {
+        ch.isLive = false;
+        addLog(`📴 ${ch.name} selesai live.`,'w');
+        if (offNotif) await sendNotif(ch, null, false);
+      } else if (res.isLive && wasLive) {
+        addLog(`🔴 ${ch.name} masih live${antiSpam?' — skip notif':''}`, 'w');
+        if (!antiSpam) await sendNotif(ch, res, true);
       } else {
-        addLog(`🔴 Masih LIVE — Mengirim notif ulang...`, 'warn');
-        await sendDiscordNotif(true);
+        addLog(`💤 ${ch.name} — tidak live`,'');
       }
-    } else {
-      addLog(`💤 Tidak live — Cek lagi dalam ${state.intervalSec}s.`, '');
-    }
-
-  } catch(err) {
-    addLog(`❌ YouTube API Error: ${err.message}`, 'error');
-    if (err.message.includes('quota')) {
-      addLog('⚠️ API Quota habis! Tunggu 24 jam atau gunakan API Key baru.', 'error');
-    } else if (err.message.includes('key')) {
-      addLog('⚠️ API Key tidak valid. Cek kembali di Step 1.', 'error');
+      if (res.isLive) liveCount++;
+    } catch(e) {
+      addLog(`❌ ${ch.name}: ${e.message}`,'e');
     }
   }
+
+  document.getElementById('stLive').textContent = liveCount;
+  document.getElementById('gbadge').textContent = liveCount>0 ? `🔴 ${liveCount} LIVE` : (isMonitoring?'MONITORING':'OFFLINE');
+  if (liveCount>0) document.getElementById('gbadge').style.background='var(--live)';
+  else if (isMonitoring) document.getElementById('gbadge').style.background='var(--success)';
+  renderCh();
+  renderLiveNow();
 }
 
-async function sendTestNow() {
-  const url = document.getElementById('webhookUrl').value.trim();
-  if (!url) { alert('⚠️ Isi Discord Webhook URL dulu!'); goStep(1); return; }
-  addLog('📨 Mengirim test notifikasi (data dummy)...', '');
-  const prev = state.liveData;
-  state.liveData = {
-    channelTitle: document.getElementById('channelInput').value || 'TestChannel',
-    streamUrl: 'https://youtube.com/watch?v=dQw4w9WgXcQ',
-    title: '🧪 Test Stream — StreamPulse',
-    thumbnail: null,
-  };
-  await sendDiscordNotif(true);
-  state.liveData = prev;
+function renderLiveNow() {
+  const lives = channels.filter(c=>c.isLive);
+  const sec = document.getElementById('liveSection');
+  const list = document.getElementById('liveList');
+  if (!lives.length) { sec.classList.add('hidden'); return; }
+  sec.classList.remove('hidden');
+  list.innerHTML = lives.map(ch=>`
+    <div class="ch-card live" style="padding:10px 14px">
+      <div class="ch-av lr">${ch.thumb?`<img src="${ch.thumb}" onerror="this.parentElement.textContent='📺'">`:'📺'}</div>
+      <div class="ch-info"><div class="ch-name">${esc(ch.name)}</div><div class="ch-st"><span class="dot live"></span><span class="ch-stxt live">LIVE SEKARANG</span></div></div>
+      <a href="https://youtube.com/channel/${ch.id}/live" target="_blank" class="btn btn-d btn-sm">▶ Tonton</a>
+    </div>`).join('');
 }
 
-// ─── LOG ─────────────────────────────────────────────
-function addLog(msg, type='') {
-  const area = document.getElementById('logArea');
-  const now = new Date().toLocaleTimeString('id-ID', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  const line = document.createElement('div');
-  line.className = 'log-line ' + type;
-  line.innerHTML = `<span class="log-time">[${now}]</span><span class="log-msg">${msg}</span>`;
-  area.appendChild(line);
-  area.scrollTop = area.scrollHeight;
-
-  // Limit log lines
-  while (area.children.length > 50) area.removeChild(area.firstChild);
-}
-
-function clearLog() {
-  document.getElementById('logArea').innerHTML = '';
-  addLog('🗑 Log dibersihkan.', '');
-}
-
-// ─── SAVE / LOAD CONFIG ──────────────────────────────
-function saveConfig() {
-  const cfg = {
-    webhook:     document.getElementById('webhookUrl').value,
-    botName:     document.getElementById('botName').value,
-    botAvatar:   document.getElementById('botAvatar').value,
-    ytApiKey:    document.getElementById('ytApiKey').value,
-    ytChannelId: document.getElementById('ytChannelId').value,
-    platform:    state.platform,
-    channel:     document.getElementById('channelInput').value,
-    embedTitle:  document.getElementById('embedTitle').value,
-    msgBody:     document.getElementById('msgBody').value,
-    embedColor:  document.getElementById('embedColor').value,
-    intervalSec: state.intervalSec,
-    mention:     state.mention,
-  };
-  localStorage.setItem('streampulse_cfg', JSON.stringify(cfg));
-}
-
-function loadConfig() {
+/* ══════════════════════════════════
+   TEST
+══════════════════════════════════ */
+async function testYt() {
+  const key = document.getElementById('ytKey').value.trim();
+  const st  = document.getElementById('stStatus');
+  if (!key) { st.style.color='var(--live)'; st.textContent='❌ API Key belum diisi!'; return; }
+  st.style.color='var(--muted)'; st.textContent='⏳ Testing...';
   try {
-    const cfg = JSON.parse(localStorage.getItem('streampulse_cfg') || '{}');
-    if (cfg.webhook)     document.getElementById('webhookUrl').value  = cfg.webhook;
-    if (cfg.botName)     document.getElementById('botName').value     = cfg.botName;
-    if (cfg.botAvatar)   document.getElementById('botAvatar').value   = cfg.botAvatar;
-    if (cfg.ytApiKey)    document.getElementById('ytApiKey').value    = cfg.ytApiKey;
-    if (cfg.ytChannelId) document.getElementById('ytChannelId').value = cfg.ytChannelId;
-    if (cfg.channel)     document.getElementById('channelInput').value = cfg.channel;
-    if (cfg.embedTitle)  document.getElementById('embedTitle').value  = cfg.embedTitle;
-    if (cfg.msgBody)     document.getElementById('msgBody').value     = cfg.msgBody;
-    if (cfg.embedColor)  document.getElementById('embedColor').value  = cfg.embedColor;
-    if (cfg.intervalSec) state.intervalSec = cfg.intervalSec;
-    if (cfg.mention)     state.mention = cfg.mention;
-    if (cfg.platform) {
-      state.platform = cfg.platform;
-      document.querySelectorAll('.platform-card').forEach(c => {
-        if (c.getAttribute('onclick').includes(cfg.platform)) c.classList.add('selected');
-      });
-    }
-  } catch(e) {}
+    const r = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${DEF_CH}&key=${key}`);
+    const d = await r.json();
+    if (d.error) throw new Error(d.error.message);
+    st.style.color='var(--success)';
+    st.textContent=`✅ YouTube API OK — ${d.items?.[0]?.snippet?.title||'Connected'}`;
+  } catch(e) { st.style.color='var(--live)'; st.textContent='❌ '+e.message; }
 }
 
-// Auto-save on input / click
-document.addEventListener('input', saveConfig);
-document.addEventListener('click', saveConfig);
+async function testWh() {
+  const url = document.getElementById('webhookUrl').value.trim();
+  const st  = document.getElementById('stStatus');
+  if (!url) { st.style.color='var(--live)'; st.textContent='❌ Webhook URL belum diisi!'; return; }
+  st.style.color='var(--muted)'; st.textContent='⏳ Mengirim test...';
+  try {
+    const r = await fetch(url, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'StreamPulse',content:'👋 **StreamPulse** — Webhook berhasil! ✅'})});
+    if (r.ok||r.status===204) { st.style.color='var(--success)'; st.textContent='✅ Discord Webhook OK! Cek channel kamu.'; }
+    else { st.style.color='var(--live)'; st.textContent=`❌ Error ${r.status}`; }
+  } catch(e) { st.style.color='var(--warn)'; st.textContent='⚠️ '+e.message; }
+}
 
-// ─── INIT ────────────────────────────────────────────
-document.getElementById('ytApiKey').value    = YT_API_KEY;
-document.getElementById('ytChannelId').value = YT_CHANNEL_ID;
-document.getElementById('channelInput').value = YT_CHANNEL_ID;
+async function sendTest() {
+  const wh = document.getElementById('webhookUrl').value.trim();
+  if (!wh) { alert('Isi Webhook URL di Pengaturan dulu!'); return; }
+  const ch  = channels[0] || {id:'test',name:'TestChannel'};
+  const ld  = {channelTitle:ch.name, streamUrl:'https://youtu.be/dQw4w9WgXcQ'};
+  addLog('📨 Mengirim test notif...','');
+  await sendNotif(ch, ld, true);
+}
 
-state.platform = 'youtube';
-document.querySelectorAll('.platform-card').forEach(c => {
-  if (c.getAttribute('onclick').includes('youtube')) c.classList.add('selected');
+/* ══════════════════════════════════
+   SETTINGS
+══════════════════════════════════ */
+function pickMention(el, val) {
+  document.querySelectorAll('#mentionPills .pill').forEach(p=>p.classList.remove('on'));
+  el.classList.add('on'); cfg.mention=val; updatePreview(); saveAll();
+}
+
+function pickInt(el, sec) {
+  document.querySelectorAll('#intPills .pill').forEach(p=>p.classList.remove('on'));
+  el.classList.add('on'); cfg.intervalSec=sec; saveAll();
+}
+
+function updatePreview() {
+  const chName = channels[0]?.name || 'ChannelName';
+  document.getElementById('pvBot').textContent     = document.getElementById('botName')?.value || 'StreamPulse';
+  document.getElementById('pvMention').textContent = cfg.mention || '';
+  document.getElementById('pvMention').style.display = cfg.mention ? '' : 'none';
+  document.getElementById('pvName').textContent    = chName;
+}
+
+document.addEventListener('input', e => {
+  const k = e.target.id;
+  if (k==='botName'||k==='botAv'||k==='ytKey'||k==='webhookUrl') {
+    if (k==='botName') cfg.botName = e.target.value;
+    if (k==='botAv')   cfg.botAv   = e.target.value;
+    if (k==='ytKey')   cfg.ytKey   = e.target.value;
+    if (k==='webhookUrl') cfg.webhookUrl = e.target.value;
+    updatePreview(); saveAll();
+  }
 });
 
-loadConfig();
-updatePreview();
+/* ══════════════════════════════════
+   LOG
+══════════════════════════════════ */
+function addLog(msg, type='') {
+  const body = document.getElementById('logBody');
+  const now  = new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const el   = document.createElement('div');
+  el.className = 'll '+type;
+  el.innerHTML = `<span class="lt">[${now}]</span><span class="lm">${msg}</span>`;
+  body.appendChild(el);
+  body.scrollTop = body.scrollHeight;
+  while (body.children.length > 100) body.removeChild(body.firstChild);
+}
+function clearLog() { document.getElementById('logBody').innerHTML=''; addLog('🗑 Log dibersihkan.',''); }
 
-setTimeout(() => {
-  const autoStart = document.getElementById('toggleAutoStart').classList.contains('on');
-  if (autoStart && document.getElementById('webhookUrl').value) {
-    goStep(4);
-    startMonitor();
+function updateStats() {
+  document.getElementById('stCh').textContent   = channels.length;
+  document.getElementById('stSent').textContent = sentCount;
+  document.getElementById('stLive').textContent = channels.filter(c=>c.isLive).length;
+}
+
+/* ══════════════════════════════════
+   SAVE / LOAD
+══════════════════════════════════ */
+function saveAll() {
+  cfg.ytKey      = document.getElementById('ytKey')?.value      || DEF_KEY;
+  cfg.webhookUrl = document.getElementById('webhookUrl')?.value || '';
+  cfg.botName    = document.getElementById('botName')?.value    || 'StreamPulse';
+  cfg.botAv      = document.getElementById('botAv')?.value      || '';
+  localStorage.setItem('sp2_cfg', JSON.stringify(cfg));
+  localStorage.setItem('sp2_chs', JSON.stringify(channels.map(c=>({...c,isLive:false,lastNotif:0}))));
+}
+
+function loadAll() {
+  try {
+    const sc = JSON.parse(localStorage.getItem('sp2_cfg')||'{}');
+    Object.assign(cfg, sc);
+    const sch = JSON.parse(localStorage.getItem('sp2_chs')||'[]');
+    channels = sch;
+  } catch(e) {}
+
+  document.getElementById('ytKey').value      = cfg.ytKey      || DEF_KEY;
+  document.getElementById('webhookUrl').value = cfg.webhookUrl || '';
+  document.getElementById('botName').value    = cfg.botName    || 'StreamPulse';
+  document.getElementById('botAv').value      = cfg.botAv      || '';
+
+  if (cfg.intervalSec) {
+    document.querySelectorAll('#intPills .pill').forEach(p => {
+      if (p.onclick?.toString().includes(cfg.intervalSec+')')) p.classList.add('on');
+      else p.classList.remove('on');
+    });
   }
-}, 500);
+  if (cfg.mention !== undefined) {
+    document.querySelectorAll('#mentionPills .pill').forEach(p => {
+      const m = p.onclick?.toString().match(/'([^']*)'\)$/);
+      if (m) p.classList.toggle('on', m[1]===cfg.mention);
+    });
+  }
+  if (!document.getElementById('togAS').classList.contains('on') && cfg.antiSpam !== false) {
+    document.getElementById('togAS').classList.add('on');
+  }
+}
+
+/* ══════════════════════════════════
+   INIT
+══════════════════════════════════ */
+loadAll();
+
+// Auto-add channel default jika kosong
+if (channels.length === 0) {
+  channels.push({id:DEF_CH, name:'Channel Saya', thumb:'', isLive:false, lastNotif:0, enabled:true});
+  resolveById(DEF_CH).then(info => {
+    channels[0].name  = info.name;
+    channels[0].thumb = info.thumb;
+    renderCh(); updatePreview(); saveAll();
+  }).catch(()=>{});
+}
+
+renderCh();
+updatePreview();
+updateStats();
 </script>
 </body>
 </html>
