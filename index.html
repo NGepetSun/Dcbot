@@ -878,23 +878,15 @@
       </div>
     </div>
 
-    <div class="input-row">
-      <div class="form-group">
-        <label>Judul Embed</label>
-        <input type="text" id="embedTitle" placeholder="🔴 LIVE SEKARANG!" value="🔴 LIVE SEKARANG!" />
-      </div>
-      <div class="form-group">
-        <label>Warna Embed</label>
-        <input type="color" id="embedColor" value="#ef4444" style="height:46px;padding:4px 8px;cursor:pointer" />
-      </div>
-    </div>
+    <!-- Hidden fields kept for save/load compatibility -->
+    <input type="hidden" id="embedTitle" value="is live!" />
+    <input type="hidden" id="embedColor" value="#ff0000" />
+    <textarea id="msgBody" style="display:none"></textarea>
 
-    <div class="form-group">
-      <label>Isi Pesan (gunakan {name}, {url}, {platform})</label>
-      <textarea id="msgBody" placeholder="Hei @everyone! {name} lagi LIVE di {platform}!\n\n🎮 Yuk join dan support!\n🔗 {url}">{name} lagi LIVE di {platform}!
-
-🎮 Yuk join dan support!
-🔗 {url}</textarea>
+    <div class="info-box" style="margin-bottom:20px">
+      <span class="icon">💡</span>
+      <div>Format notif: <strong>@everyone</strong> → <strong>[Channel] is live!</strong> → link <code>youtu.be/xxxxx</code><br>
+      Discord akan otomatis embed thumbnail & judul stream dari link YouTube.</div>
     </div>
 
     <div class="form-group">
@@ -952,13 +944,17 @@
             <span class="bot-tag" style="margin-left:6px">BOT</span>
           </div>
         </div>
-        <div class="embed" id="embedPreview">
-          <div class="embed-title" id="previewTitle">🔴 LIVE SEKARANG!</div>
-          <div class="embed-desc" id="previewDesc">YourChannel lagi LIVE di YouTube!<br><br>🎮 Yuk join dan support!<br>🔗 https://youtube.com/yourlink</div>
-          <div class="embed-field">
-            <div class="embed-field-name">Platform</div>
-            <div class="embed-field-value" id="previewPlatform">YouTube</div>
-          </div>
+        <!-- Simple format preview matching screenshot -->
+        <div style="font-size:13px;color:#dcddde;line-height:1.8" id="embedPreview">
+          <div id="previewMention" style="color:#7289da;font-weight:600">@everyone</div>
+          <div><strong id="previewChannelName" style="color:#fff">YourChannel</strong> <span id="previewLiveText">is live!</span></div>
+          <div id="previewLink" style="color:#00b0f4;margin-top:2px">https://youtu.be/xxxxxxx</div>
+        </div>
+        <!-- Auto-embed thumbnail preview -->
+        <div style="margin-top:12px;background:#2f3136;border-radius:4px;padding:12px;border-left:4px solid #ff0000">
+          <div style="font-size:11px;color:#b9bbbe;margin-bottom:4px">YouTube</div>
+          <div style="color:#fff;font-weight:700;font-size:13px" id="previewTitle">Live Stream Title</div>
+          <div style="margin-top:8px;background:#1a1a1a;border-radius:4px;height:80px;display:flex;align-items:center;justify-content:center;color:#666;font-size:11px">🖼 Thumbnail otomatis muncul dari YouTube</div>
         </div>
       </div>
     </div>
@@ -1102,22 +1098,24 @@ function toggleMention(el, val) {
 
 // ─── PREVIEW UPDATE ──────────────────────────────────
 function updatePreview() {
-  const name = document.getElementById('channelInput')?.value || 'YourChannel';
-  const platform = state.platform ? state.platform.charAt(0).toUpperCase() + state.platform.slice(1) : 'YouTube';
-  const title = document.getElementById('embedTitle')?.value || '🔴 LIVE SEKARANG!';
-  const body = document.getElementById('msgBody')?.value || '';
-  const color = document.getElementById('embedColor')?.value || '#ef4444';
+  const name     = document.getElementById('channelInput')?.value || 'YourChannel';
+  const botName  = document.getElementById('botName')?.value || 'NotifyMe';
+  const mention  = state.mention || '@everyone';
 
-  const formatted = body
-    .replace(/{name}/g, name)
-    .replace(/{platform}/g, platform)
-    .replace(/{url}/g, 'https://'+state.platform+'.com/'+name);
+  // Update bot name
+  const previewBotEl = document.getElementById('previewBotName');
+  if (previewBotEl) previewBotEl.textContent = botName;
 
-  document.getElementById('previewTitle').textContent = title;
-  document.getElementById('previewDesc').innerHTML = formatted.replace(/\n/g,'<br>');
-  document.getElementById('previewPlatform').textContent = platform;
-  document.getElementById('previewBotName').textContent = document.getElementById('botName')?.value || 'StreamPulse Bot';
-  document.getElementById('embedPreview').style.borderLeftColor = color;
+  // Update simple content preview
+  const mentionEl = document.getElementById('previewMention');
+  const channelEl = document.getElementById('previewChannelName');
+  const linkEl    = document.getElementById('previewLink');
+  const titleEl   = document.getElementById('previewTitle');
+
+  if (mentionEl) mentionEl.textContent = mention || '';
+  if (channelEl) channelEl.textContent = name;
+  if (linkEl)    linkEl.textContent    = `https://youtu.be/xxxxxxx`;
+  if (titleEl)   titleEl.textContent   = 'Live Stream Title';
 }
 
 document.addEventListener('input', updatePreview);
@@ -1162,66 +1160,45 @@ async function testWebhook() {
 }
 
 // ─── SEND DISCORD NOTIFICATION ──────────────────────
+// Format: simple seperti screenshot — mention, "name is live!", link pendek, thumbnail otomatis dari Discord
 async function sendDiscordNotif(isLiveStart = true, overrideLiveData = null) {
-  const url = document.getElementById('webhookUrl').value.trim();
-  if (!url) return;
+  const webhookUrl = document.getElementById('webhookUrl').value.trim();
+  if (!webhookUrl) return;
 
   const live = overrideLiveData || state.liveData;
   const channelName = live?.channelTitle || document.getElementById('channelInput').value || 'Streamer';
-  const streamUrl   = live?.streamUrl || `https://youtube.com/channel/${document.getElementById('channelInput').value || YT_CHANNEL_ID}/live`;
-  const streamTitle = live?.title || 'Live Stream';
-  const thumbnail   = live?.thumbnail || null;
+  const videoId     = live?.videoId || null;
+  // Gunakan youtu.be short link agar thumbnail embed muncul otomatis di Discord
+  const streamUrl   = videoId
+    ? `https://youtu.be/${videoId}`
+    : (live?.streamUrl || `https://youtube.com/channel/${YT_CHANNEL_ID}/live`);
 
-  const platform = 'YouTube';
-
-  const bodyTemplate = document.getElementById('msgBody').value;
-  const body = bodyTemplate
-    .replace(/{name}/g, channelName)
-    .replace(/{platform}/g, platform)
-    .replace(/{url}/g, streamUrl)
-    .replace(/{title}/g, streamTitle);
-
-  const embedTitle = document.getElementById('embedTitle').value || '🔴 LIVE SEKARANG!';
-  const color = parseInt(document.getElementById('embedColor').value.replace('#',''), 16);
   const mention = state.mention ? state.mention + '\n' : '';
-
-  const liveEmbed = {
-    title: embedTitle,
-    description: body,
-    url: streamUrl,
-    color,
-    fields: [
-      { name: '📺 Channel', value: channelName, inline: true },
-      { name: '🎮 Platform', value: platform, inline: true },
-      { name: '🎬 Judul Stream', value: streamTitle, inline: false },
-      { name: '🔗 Tonton Sekarang', value: `[Klik di sini](${streamUrl})`, inline: false },
-    ],
-    footer: { text: 'StreamPulse Notifier • Powered by YouTube Data API v3' },
-    timestamp: new Date().toISOString(),
-  };
-  if (thumbnail) liveEmbed.image = { url: thumbnail };
-
-  const offlineEmbed = {
-    title: '📴 Stream Selesai',
-    description: `**${channelName}** telah selesai melakukan live streaming.\n\n[Tonton VOD](${streamUrl})`,
-    color: 0x6b7280,
-    fields: [{ name: '📺 Channel', value: channelName, inline: true }],
-    footer: { text: 'StreamPulse Notifier' },
-    timestamp: new Date().toISOString(),
-  };
-
-  const payload = {
-    username: document.getElementById('botName').value || 'StreamPulse Bot',
-    content: isLiveStart
-      ? mention + `**${channelName}** sekarang sedang LIVE di YouTube! 🔴`
-      : `📴 **${channelName}** telah selesai live.`,
-    embeds: [isLiveStart ? liveEmbed : offlineEmbed],
-  };
+  const botName = document.getElementById('botName').value.trim() || 'NotifyMe';
   const avatarUrl = document.getElementById('botAvatar').value.trim();
+
+  let payload;
+
+  if (isLiveStart) {
+    // Format persis seperti screenshot:
+    // @everyone
+    // **name** is live!
+    // https://youtu.be/xxxxx   ← Discord auto-embed thumbnail dari link ini
+    payload = {
+      username: botName,
+      content: `${mention}**${channelName}** is live!\n${streamUrl}`,
+    };
+  } else {
+    payload = {
+      username: botName,
+      content: `📴 **${channelName}** has ended the stream.`,
+    };
+  }
+
   if (avatarUrl) payload.avatar_url = avatarUrl;
 
   try {
-    const res = await fetch(url, {
+    const res = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -1229,7 +1206,7 @@ async function sendDiscordNotif(isLiveStart = true, overrideLiveData = null) {
     if (res.ok || res.status === 204) {
       state.sentCount++;
       document.getElementById('statSent').textContent = state.sentCount;
-      addLog(isLiveStart ? '✅ Notif LIVE terkirim ke Discord!' : '📴 Notif selesai live terkirim.', 'success');
+      addLog(isLiveStart ? `✅ Notif LIVE terkirim! "${channelName} is live!" + ${streamUrl}` : '📴 Notif selesai live terkirim.', 'success');
     } else {
       const errBody = await res.text();
       addLog(`❌ Gagal kirim notif Discord (${res.status}): ${errBody.substring(0,80)}`, 'error');
